@@ -1,0 +1,42 @@
+version: 1
+app:
+  id: payments-api
+  description: Payments service — REST API and PostgreSQL DB
+
+  environments:
+    - name: forno
+      base_url: https://opa-standalone.apps.core-frn.habitat.zone
+
+      profiles:
+        - name: support-user
+          kind: api_token
+          acquire_strategy:
+            kind: http
+            method: GET
+            url: https://opa-standalone.apps.core-frn.habitat.zone/v1/data/quintoandar/s2s/token
+            output_mapping:
+              kind: api_token
+              token_path: result.token
+              error_path: result.error
+              trace_id_path: decision_id
+          renewal_policy:
+            ttl: 1800 # 30 minutes
+            renew_before_expiry: 300
+
+        - name: readonly
+          kind: db_connection
+          acquire_strategy:
+            kind: shell
+            command: qli db get -e forno -r readonly payments-api --ttl=48h -o json
+            output_mapping:
+              kind: db_connection
+              unwrap_array: true
+              host_path: hostname
+              port_path: port
+              user_path: username
+              password_path: password
+              dbname_path: database
+              lease_id_path: id
+          renewal_policy:
+            ttl: 172800 # 48 hours
+            renew_before_expiry: 3600
