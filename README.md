@@ -75,7 +75,7 @@ npm link        # installs the `hexlane` binary globally via npm link
 
 ```bash
 # 1. Register an app
-hexlane app add --file ./my-app.yaml
+hexlane app add --file ./my-app.yaml # see examples/my-app.yaml
 
 # 2. Discover what's available
 hexlane app list

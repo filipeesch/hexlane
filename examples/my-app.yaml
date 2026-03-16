@@ -20,7 +20,7 @@ app:
               token_path: access_token
               # expires_at_path: expires_at   # optional — JWT exp claim is read automatically
           renewal_policy:
-            ttl: 3600              # fallback expiry in seconds (if no exp claim)
+            ttl: 3600 # fallback expiry in seconds (if no exp claim)
             renew_before_expiry: 300
 
         # ─── Option B: static JWT — loaded once via `hexlane credential set` ───
@@ -44,52 +44,12 @@ app:
             command: "db-cli credentials get --env production --role readonly --output json"
             output_mapping:
               kind: db_connection
-              unwrap_array: true      # if the command outputs [{...}], extracts first element
+              unwrap_array: true # if the command outputs [{...}], extracts first element
               host_path: hostname
               port_path: port
               user_path: username
               password_path: password
               dbname_path: database
           renewal_policy:
-            ttl: 172800             # 48 hours
+            ttl: 172800 # 48 hours
             renew_before_expiry: 3600
-
-  operations:
-    # ─── API operation ──────────────────────────────────────────────────────────
-    - name: get-resource
-      kind: api
-      description: Fetch a single resource by ID
-      profile: default
-      defaultEnv: production
-      tags: [read]
-      readOnly: true
-      parameters:
-        - name: resourceId
-          type: string
-          required: true
-          description: Unique resource identifier
-      execution:
-        method: GET
-        path: /api/v1/resources/{{ resourceId }}
-      examples:
-        - description: Fetch resource abc-123
-          command: hexlane op run my-app/get-resource --env production --profile default --param resourceId=abc-123
-
-    # ─── DB operation ───────────────────────────────────────────────────────────
-    - name: find-record
-      kind: db
-      description: Look up a record by ID
-      profile: readonly
-      defaultEnv: production
-      tags: [read, db]
-      readOnly: true
-      parameters:
-        - name: recordId
-          type: integer
-          required: true
-          description: Numeric record primary key
-      execution:
-        sql: "SELECT * FROM records WHERE id = :recordId"
-      examples:
-        - description: Find record with id 42
-          command: hexlane op run my-app/find-record --env production --profile readonly --param recordId=42
