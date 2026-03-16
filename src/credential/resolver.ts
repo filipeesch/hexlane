@@ -29,6 +29,12 @@ export class CredentialResolver {
 
         if (existing && existing.status === "active") {
             if (this.needsRenewal(existing, profile)) {
+                if (profile.acquire_strategy.kind === "static") {
+                    throw new Error(
+                        `Static credential for ${app}/${env}/${profile.name} has expired. ` +
+                        `Run: hexlane credential set --app ${app} --env ${env} --profile ${profile.name}`
+                    );
+                }
                 debugLog(`credential`, `renewing ${app}/${env}/${profile.name} (expires ${existing.expires_at})`);
                 return this.renew(app, env, profile, existing);
             }
@@ -37,13 +43,20 @@ export class CredentialResolver {
             return existing;
         }
 
+        if (profile.acquire_strategy.kind === "static") {
+            throw new Error(
+                `No credential found for ${app}/${env}/${profile.name}. ` +
+                `Run: hexlane credential set --app ${app} --env ${env} --profile ${profile.name}`
+            );
+        }
+
         debugLog(`credential`, `acquiring new credential for ${app}/${env}/${profile.name}`);
         return this.acquire(app, env, profile);
     }
 
     private needsRenewal(record: CredentialRecord, profile: Profile): boolean {
         if (!record.expires_at) return false;
-        const renewBeforeMs = (profile.renewal_policy.renew_before_expiry ?? 300) * 1000;
+        const renewBeforeMs = (profile.renewal_policy?.renew_before_expiry ?? 300) * 1000;
         const expiresAt = new Date(record.expires_at).getTime();
         return Date.now() >= expiresAt - renewBeforeMs;
     }
@@ -63,7 +76,7 @@ export class CredentialResolver {
             let expiresAt: string | null = null;
             if (result.expires_at) {
                 expiresAt = result.expires_at.toISOString();
-            } else if (profile.renewal_policy.ttl) {
+            } else if (profile.renewal_policy?.ttl) {
                 expiresAt = new Date(now.getTime() + profile.renewal_policy.ttl * 1000).toISOString();
             }
 
@@ -131,7 +144,7 @@ export class CredentialResolver {
             let expiresAt: string | null = null;
             if (result.expires_at) {
                 expiresAt = result.expires_at.toISOString();
-            } else if (profile.renewal_policy.ttl) {
+            } else if (profile.renewal_policy?.ttl) {
                 expiresAt = new Date(now.getTime() + profile.renewal_policy.ttl * 1000).toISOString();
             }
 

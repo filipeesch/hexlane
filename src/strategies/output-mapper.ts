@@ -81,7 +81,7 @@ function secondsOrEpoch(n: number, acquiredAt: Date): Date {
  * Decodes the JWT payload (no verification — claims are not encrypted) and
  * returns the `exp` claim as a Date, or null if not present or not a valid JWT.
  */
-function tryDecodeJwtExp(token: string): Date | null {
+export function tryDecodeJwtExp(token: string): Date | null {
     try {
         const parts = token.split(".");
         if (parts.length !== 3) return null;

@@ -272,17 +272,10 @@ export function registerOpCommands(program: Command): void {
                         path: rendered.path,
                         body: rendered.body,
                         baseUrl: env.base_url,
+                        auth: profile.auth,
                     });
 
-                    if (opts.json || opts.toon) {
-                        output({ status: result.status, headers: result.headers, body: result.body });
-                    } else {
-                        console.error(`HTTP ${result.status}`);
-                        for (const [k, v] of Object.entries(result.headers)) {
-                            console.error(`  ${k}: ${v}`);
-                        }
-                        output(result.body);
-                    }
+                    output({ status: result.status, headers: result.headers, body: result.body });
                 } else {
                     if (profile.kind !== "db_connection") {
                         die(`Profile "${profileName}" is kind "${profile.kind}", not "db_connection". Use a db_connection profile for DB operations.`);
@@ -326,6 +319,7 @@ export function registerOpCommands(program: Command): void {
         .option("--profile <profile>", "Default profile name")
         .option("--default-env <env>", "Default environment name")
         .option("--tag <tag>", "Tag (repeatable)", collectArr, [] as string[])
+        .option("--body <template>", "Request body template (api only); use {{ varName }} for params")
         .option("--readonly", "Mark operation as read-only (api only; db defaults to true)")
         .option("--description <text>", "Operation description")
         .action((opts: {
@@ -334,6 +328,7 @@ export function registerOpCommands(program: Command): void {
             kind: string;
             method?: string;
             path?: string;
+            body?: string;
             sql?: string;
             param: string[];
             profile?: string;
@@ -379,6 +374,7 @@ export function registerOpCommands(program: Command): void {
                         name: opts.name,
                         method: opts.method,
                         path: opts.path,
+                        body: opts.body,
                         params,
                         profile: opts.profile,
                         defaultEnv: opts.defaultEnv,

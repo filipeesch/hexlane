@@ -25,36 +25,19 @@ export function isToonMode(): boolean {
 export function output(data: unknown): void {
     if (jsonMode) {
         process.stdout.write(JSON.stringify(data, null, 2) + "\n");
-    } else if (toonMode) {
-        process.stdout.write(encode(data) + "\n");
+    } else if (typeof data === "string") {
+        console.log(data);
     } else {
-        if (typeof data === "string") {
-            console.log(data);
-        } else {
-            console.log(JSON.stringify(data, null, 2));
-        }
+        process.stdout.write(encode(data) + "\n");
     }
 }
 
 export function outputTable(
     rows: Record<string, unknown>[],
-    columns: string[]
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _columns: string[]
 ): void {
-    if (jsonMode || toonMode || rows.length === 0) {
-        output(rows);
-        return;
-    }
-    // Simple column-aligned table
-    const widths = columns.map((col) =>
-        Math.max(col.length, ...rows.map((r) => String(r[col] ?? "").length))
-    );
-    const header = columns.map((c, i) => c.padEnd(widths[i]!)).join("  ");
-    const divider = widths.map((w) => "-".repeat(w)).join("  ");
-    console.log(header);
-    console.log(divider);
-    for (const row of rows) {
-        console.log(columns.map((c, i) => String(row[c] ?? "").padEnd(widths[i]!)).join("  "));
-    }
+    output(rows);
 }
 
 export function die(message: string, exitCode = 1): never {

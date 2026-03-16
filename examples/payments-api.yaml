@@ -1,11 +1,11 @@
 version: 1
 app:
   id: payments-api
-  description: Payments service — REST API and PostgreSQL DB
+  description: Payments service — REST API and DB
 
   environments:
-    - name: forno
-      base_url: https://opa-standalone.apps.core-frn.habitat.zone
+    - name: production
+      base_url: https://api.example.com
 
       profiles:
         - name: support-user
@@ -13,7 +13,7 @@ app:
           acquire_strategy:
             kind: http
             method: GET
-            url: https://opa-standalone.apps.core-frn.habitat.zone/v1/data/quintoandar/s2s/token
+            url: https://auth.example.com/v1/token
             output_mapping:
               kind: api_token
               token_path: result.token
@@ -27,7 +27,7 @@ app:
           kind: db_connection
           acquire_strategy:
             kind: shell
-            command: qli db get -e forno -r readonly payments-api --ttl=48h -o json
+            command: db-cli credentials get --env production --role readonly --app payments-api --ttl=48h --output json
             output_mapping:
               kind: db_connection
               unwrap_array: true
@@ -41,12 +41,23 @@ app:
             ttl: 172800 # 48 hours
             renew_before_expiry: 3600
 
+        # Static JWT profile — token loaded once via `hexlane credential set`
+        - name: static-integration
+          kind: api_token
+          acquire_strategy:
+            kind: static
+          # auth defaults to Bearer; override if the API expects a different header:
+          # auth:
+          #   kind: header
+          #   name: X-Api-Key
+          # renewal_policy omitted — expiry from JWT exp claim or non-expiring
+
 operations:
   - name: get-order
     description: Fetch a single order by ID
     kind: api
     profile: support-user
-    defaultEnv: forno
+    defaultEnv: production
     tags: [orders, read]
     readOnly: true
     parameters:
@@ -59,13 +70,13 @@ operations:
       path: /api/v1/orders/{{ orderId }}
     examples:
       - description: Fetch order 123
-        command: hexlane op run payments-api/get-order --env forno --profile support-user --param orderId=123
+        command: hexlane op run payments-api/get-order --env production --profile support-user --param orderId=123
 
   - name: find-order-row
     description: Look up a raw order record from the database by ID
     kind: db
     profile: readonly
-    defaultEnv: forno
+    defaultEnv: production
     tags: [orders, read, db]
     readOnly: true
     parameters:
@@ -77,4 +88,4 @@ operations:
       sql: "SELECT * FROM orders WHERE id = :orderId"
     examples:
       - description: Find order row for id 123
-        command: hexlane op run payments-api/find-order-row --env forno --profile readonly --param orderId=123
+        command: hexlane op run payments-api/find-order-row --env production --profile readonly --param orderId=123

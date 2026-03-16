@@ -20,6 +20,7 @@ export function registerDbCommands(program: Command): void {
         .option("--sql-file <path>", "SQL query from file")
         .option("--param <key=value>", "Bind a named SQL parameter (:name), repeatable", (val: string, prev: string[]) => [...prev, val], [] as string[])
         .option("--limit <n>", "Max rows returned (default: 500)", parseInt)
+        .option("--dry-run", "Preview the final SQL and bound params without executing")
         .option("--json", "Output results as JSON array")
         .option("--toon", "Output results as TOON (token-efficient format)")
         .option("--debug", "Enable verbose debug logging to stderr")
@@ -31,6 +32,7 @@ export function registerDbCommands(program: Command): void {
             sqlFile?: string;
             param: string[];
             limit?: number;
+            dryRun?: boolean;
             json?: boolean;
             toon?: boolean;
             debug?: boolean;
@@ -57,6 +59,11 @@ export function registerDbCommands(program: Command): void {
                     const eq = entry.indexOf("=");
                     if (eq < 1) die(`Invalid --param "${entry}": expected format key=value`);
                     params[entry.slice(0, eq)] = entry.slice(eq + 1);
+                }
+
+                if (opts.dryRun) {
+                    output({ "dry-run": true, sql, params });
+                    return;
                 }
 
                 const ctx = getContext();

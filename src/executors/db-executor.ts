@@ -53,7 +53,7 @@ export async function executeDbQuery(
     // Bind :name placeholders → $1, $2, ... using pg parameterized queries (injection-safe)
     const paramValues: (string | number | boolean)[] = [];
     const paramIndex: Record<string, number> = {};
-    const safeSql = limitedSql.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, name: string) => {
+    const safeSql = limitedSql.replace(/(?<!:):([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, name: string) => {
         if (!(name in params)) {
             throw new Error(`SQL parameter ":${name}" has no value. Pass --param ${name}=<value>`);
         }

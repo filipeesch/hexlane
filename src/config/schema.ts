@@ -58,9 +58,40 @@ const HttpStrategySchema = z.object({
     output_mapping: OutputMappingSchema,
 });
 
+// Static strategy — token is stored in the vault via `hexlane credential set`.
+// No acquisition happens automatically; the token must be pre-loaded.
+const StaticStrategySchema = z.object({
+    kind: z.literal("static"),
+});
+
 const StrategySchema = z.discriminatedUnion("kind", [
     ShellStrategySchema,
     HttpStrategySchema,
+    StaticStrategySchema,
+]);
+
+// ─── Auth Injection ──────────────────────────────────────────────────────────
+// Controls how the token is injected into outgoing API requests.
+// Defaults to Bearer if omitted.
+
+const BearerAuthSchema = z.object({
+    kind: z.literal("bearer"),
+});
+
+const HeaderAuthSchema = z.object({
+    kind: z.literal("header"),
+    name: z.string().min(1),  // e.g. "X-Api-Key"
+});
+
+const QueryParamAuthSchema = z.object({
+    kind: z.literal("query_param"),
+    name: z.string().min(1),  // e.g. "api_key"
+});
+
+const AuthSchema = z.discriminatedUnion("kind", [
+    BearerAuthSchema,
+    HeaderAuthSchema,
+    QueryParamAuthSchema,
 ]);
 
 // ─── Renewal Policy ──────────────────────────────────────────────────────────
@@ -81,9 +112,17 @@ const ProfileSchema = z.object({
     name: z.string().min(1).regex(/^[a-z0-9-]+$/, "Profile name must be lowercase alphanumeric with dashes"),
     kind: z.enum(["api_token", "db_connection"]),
     acquire_strategy: StrategySchema,
-    renewal_policy: RenewalPolicySchema,
+    // auth controls how the token is injected into requests (api_token only).
+    // Defaults to Bearer if omitted.
+    auth: AuthSchema.optional(),
+    // renewal_policy is optional for static profiles (token has no auto-renewal).
+    renewal_policy: RenewalPolicySchema.optional(),
 }).refine(
-    (p) => p.acquire_strategy.output_mapping.kind === p.kind,
+    (p) => {
+        // Static strategy has no output_mapping — skip the kind check
+        if (p.acquire_strategy.kind === "static") return true;
+        return (p.acquire_strategy as { output_mapping: { kind: string } }).output_mapping.kind === p.kind;
+    },
     { message: "output_mapping.kind must match profile kind" }
 );
 
@@ -113,6 +152,8 @@ export type Environment = z.infer<typeof EnvironmentSchema>;
 export type Strategy = z.infer<typeof StrategySchema>;
 export type ShellStrategy = z.infer<typeof ShellStrategySchema>;
 export type HttpStrategy = z.infer<typeof HttpStrategySchema>;
+export type StaticStrategy = z.infer<typeof StaticStrategySchema>;
+export type Auth = z.infer<typeof AuthSchema>;
 export type OutputMapping = z.infer<typeof OutputMappingSchema>;
 export type ApiTokenMapping = z.infer<typeof ApiTokenMappingSchema>;
 export type DbConnectionMapping = z.infer<typeof DbConnectionMappingSchema>;

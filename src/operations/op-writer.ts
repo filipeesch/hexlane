@@ -48,6 +48,7 @@ export interface BuildApiOperationOpts {
     name: string;
     method: string;
     path: string;
+    body?: string;
     params?: RawParam[];
     profile?: string;
     defaultEnv?: string;
@@ -87,7 +88,7 @@ export function buildOperation(opts: BuildOperationOpts): Operation {
             ...(opts.tags && opts.tags.length > 0 && { tags: opts.tags }),
             ...(opts.readOnly !== undefined && { readOnly: opts.readOnly }),
             parameters,
-            execution: { method: opts.method.toUpperCase(), path: opts.path },
+            execution: { method: opts.method.toUpperCase(), path: opts.path, ...(opts.body !== undefined && { body: opts.body }) },
         };
     } else {
         raw = {

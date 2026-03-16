@@ -1,6 +1,7 @@
 import type { VaultManager } from "../vault/vault-manager.js";
 import type { CredentialRecord } from "../metadata/store.js";
 import type { ApiTokenSecret } from "../vault/types.js";
+import type { Auth } from "../config/schema.js";
 import type { AuditLogger } from "../audit/logger.js";
 import { debugLog } from "../cli/debug.js";
 
@@ -9,6 +10,8 @@ interface ApiCallOptions {
     path: string;
     body?: string;
     baseUrl: string;
+    // How the token is injected. Defaults to Bearer if omitted.
+    auth?: Auth;
 }
 
 export interface ApiCallResult {
@@ -29,16 +32,27 @@ export async function executeApiCall(
     }
 
     // Build URL — base_url + path
-    const url = options.baseUrl.replace(/\/$/, "") + "/" + options.path.replace(/^\//, "");
+    let url = options.baseUrl.replace(/\/$/, "") + "/" + options.path.replace(/^\//, "");
     debugLog(`api call`, `${options.method.toUpperCase()} ${url}`);
+
+    // Inject auth based on configured mode (defaults to Bearer)
+    const requestHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    };
+    const auth = options.auth;
+    if (!auth || auth.kind === "bearer") {
+        requestHeaders["Authorization"] = `Bearer ${secret.token}`;
+    } else if (auth.kind === "header") {
+        requestHeaders[auth.name] = secret.token;
+    } else if (auth.kind === "query_param") {
+        const separator = url.includes("?") ? "&" : "?";
+        url += `${separator}${encodeURIComponent(auth.name)}=${encodeURIComponent(secret.token)}`;
+    }
 
     const response = await fetch(url, {
         method: options.method.toUpperCase(),
-        headers: {
-            Authorization: `Bearer ${secret.token}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
+        headers: requestHeaders,
         body: options.body ?? undefined,
     });
 

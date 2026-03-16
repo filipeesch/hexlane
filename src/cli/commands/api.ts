@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import { getContext } from "../context.js";
-import { output, die, setJsonMode, setToonMode, isJsonMode, isToonMode } from "../output.js";
+import { output, die, setJsonMode, setToonMode } from "../output.js";
 import { setDebugMode } from "../debug.js";
 import { executeApiCall } from "../../executors/api-executor.js";
 
@@ -67,17 +67,10 @@ export function registerApiCommands(program: Command): void {
                     path: opts.path,
                     body,
                     baseUrl: env.base_url,
+                    auth: profile.auth,
                 });
 
-                if (isJsonMode() || isToonMode()) {
-                    output({ status: result.status, headers: result.headers, body: result.body });
-                } else {
-                    console.error(`HTTP ${result.status}`);
-                    for (const [k, v] of Object.entries(result.headers)) {
-                        console.error(`  ${k}: ${v}`);
-                    }
-                    output(result.body);
-                }
+                output({ status: result.status, headers: result.headers, body: result.body });
             } catch (e: unknown) {
                 die((e as Error).message);
             }

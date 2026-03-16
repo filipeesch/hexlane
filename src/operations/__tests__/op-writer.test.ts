@@ -98,6 +98,26 @@ describe("buildOperation — api", () => {
         ).toThrow(/Invalid operation/);
     });
 
+    it("includes body in execution when provided", () => {
+        const op = buildOperation({
+            kind: "api",
+            name: "create-order",
+            method: "POST",
+            path: "/orders",
+            body: '{"type": "{{ orderType }}"}',
+        });
+        if (op.kind === "api") {
+            expect(op.execution.body).toBe('{"type": "{{ orderType }}"}');
+        }
+    });
+
+    it("omits body from execution when not provided", () => {
+        const op = buildOperation({ kind: "api", name: "ping", method: "GET", path: "/ping" });
+        if (op.kind === "api") {
+            expect(op.execution.body).toBeUndefined();
+        }
+    });
+
     it("throws on invalid operation name (uppercase)", () => {
         expect(() =>
             buildOperation({ kind: "api", name: "GetOrder", method: "GET", path: "/orders" })
@@ -201,6 +221,24 @@ describe("addOperationToFile", () => {
         const ops = app["operations"] as Array<Record<string, unknown>>;
         expect(ops[0]!["readOnly"]).toBe(true);
         expect(ops[0]!["kind"]).toBe("db");
+    });
+
+    it("persists body when provided", () => {
+        fs.writeFileSync(configPath, makeAppYaml(), "utf8");
+        const op = buildOperation({
+            kind: "api",
+            name: "create-order",
+            method: "POST",
+            path: "/orders",
+            body: '{"type": "{{ orderType }}"}',
+        });
+        addOperationToFile(configPath, op);
+
+        const result = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+        const app = result["app"] as Record<string, unknown>;
+        const ops = app["operations"] as Array<Record<string, unknown>>;
+        const exec = ops[0]!["execution"] as Record<string, unknown>;
+        expect(exec["body"]).toBe('{"type": "{{ orderType }}"}');
     });
 });
 

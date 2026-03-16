@@ -41,8 +41,8 @@ hexlane op show payments-api/get-order
 # Dry-run: render the execution template without hitting network or DB
 hexlane op run payments-api/get-order --env dev --profile support-user --param orderId=123 --dry-run
 
-# Run an operation
-hexlane op run payments-api/get-order --env dev --profile support-user --param orderId=123 --json
+# Run an operation (output is TOON by default; pass --json to get JSON)
+hexlane op run payments-api/get-order --env dev --profile support-user --param orderId=123
 ```
 
 **Operation names are always app-qualified:** `<app-id>/<operation-name>` (e.g. `payments-api/get-order`).
@@ -66,7 +66,8 @@ hexlane op run <app/op> \                  # run the operation
   --profile <profile> \                    # optional if operation has a default profile
   --param name=value \                     # repeatable, typed, validated
   [--dry-run]                              # render template only, no execution
-  [--json] [--toon] [--debug] [--limit N]
+  [--json]                                 # override default TOON output with JSON
+  [--debug] [--limit N]
 
 # Add an operation to a registered app config
 hexlane op add \
@@ -75,7 +76,8 @@ hexlane op add \
   --kind api|db \                          # required
   --method GET|POST|PUT|PATCH|DELETE \     # required for api
   --path "/resource/{{ paramName }}" \     # required for api; {{ var }} for templating
-  --sql "SELECT * FROM t WHERE id = :id" \ # required for db
+  --body '{"key": "{{ paramName }}"}' \   # optional request body template (api only)
+  --sql "SELECT * FROM t WHERE id = :id" \ # required for db; ::type casts are safe (e.g. id::text)
   --param "name:type:required:description" \ # repeatable; type: string|integer|number|boolean
                                            # third segment: "required" (default) or "optional"
                                            # only the literal word "optional" marks a param as not required
@@ -91,14 +93,15 @@ hexlane op delete <app-id>/<operation-name>
 
 ### `hexlane db query` — Run a SQL query against a registered database
 
-Connects using stored credentials for the given app/env/profile. Credentials are acquired and renewed automatically — no passwords needed. A 500-row safety cap is applied unless overridden.
+Connects using stored credentials for the given app/env/profile. Credentials are acquired and renewed automatically — no passwords needed. A 500-row safety cap is applied unless overridden. **Output is TOON by default.**
 
 ```bash
 hexlane db query --app <app> --env <env> --profile <profile> --sql "<SQL>"
 
 # Named parameters (:name placeholders — injection-safe, bound via pg parameterized queries)
+# PostgreSQL ::type cast syntax (e.g. id::text, val::boolean) is safe — does NOT conflict with :name params
 hexlane db query --app <app> --env <env> --profile <profile> \
-  --sql "SELECT * FROM table WHERE id = :id" \
+  --sql "SELECT id::text, name FROM table WHERE id = :id" \
   --param id=<value>
 
 # Multiple params
@@ -110,15 +113,15 @@ hexlane db query ... \
 hexlane db query ... --sql-file ./query.sql
 
 # Options
---json          # Output as JSON array
---toon          # Output as TOON (compact, token-efficient — best for uniform flat rows)
+--dry-run       # Preview the final SQL and bound params without connecting to the database
+--json          # Override default TOON output with JSON
 --limit 50      # Override default 500-row cap
 --debug         # Log credential state, final SQL, param bindings, connection info to stderr
 ```
 
 ### `hexlane api call` — Make an authenticated HTTP request
 
-Fetches and injects the Bearer token for the given app/env/profile automatically. The `base_url` is configured in the app — only pass the path. Always returns status code, headers, and response body.
+Fetches and injects the Bearer token for the given app/env/profile automatically. The `base_url` is configured in the app — only pass the path. **Always returns a structured envelope `{ status, headers, body }` in TOON format by default.** This means status code and headers are always included in the stdout output — there is no stderr split.
 
 ```bash
 hexlane api call --app <app> --env <env> --profile <profile> \
@@ -133,9 +136,8 @@ hexlane api call ... --method POST --path /api/v1/resource \
   --body-file ./payload.json
 
 # Options
---json    # Full response envelope: { status, headers, body }
---toon    # TOON format
---debug   # Log URL, status, response headers to stderr
+--json    # Override default TOON output with JSON (envelope shape is the same: { status, headers, body })
+--debug   # Log URL, request headers, and response details to stderr
 ```
 
 ### `hexlane credential` — Inspect and manage cached credentials
@@ -167,7 +169,7 @@ hexlane app remove <app-id>                   # remove an app
 2. **Discover operations** — `hexlane op list --app <app-id>`. If an operation exists for your task, use it.
 3. **Before running an op** — `hexlane op show <app/op>` to read parameter names/types, then `--dry-run` to confirm the rendered execution before it fires.
 4. **Use `--param` for all variable values** — never interpolate values into `--sql` or paths.
-5. **Output** — `--toon` for many uniform flat rows, `--json` for structured/nested data or when you need status+headers.
+5. **Output** — TOON is the default format for all commands. Use `--json` when you specifically need JSON (e.g. piping into a JSON parser). API responses always include `{ status, headers, body }` in one envelope.
 6. **Debug failures** — add `--debug` to trace credential state, SQL, and HTTP details. On 401, run `hexlane credential revoke ...` and retry.
 
 ---
@@ -179,28 +181,37 @@ hexlane app remove <app-id>                   # remove an app
 hexlane app list
 hexlane app show my-app
 
-# 2. Count rows in a table
+# 2. Count rows in a table (TOON by default)
 hexlane db query --app <app> --env <env> --profile <profile> \
-  --sql "SELECT COUNT(*) FROM my_table" --json
+  --sql "SELECT COUNT(*) FROM my_table"
 
-# 3. Look up a specific record
+# 3. Look up a specific record — preview SQL before running
 hexlane db query --app <app> --env <env> --profile <profile> \
   --sql "SELECT * FROM my_table WHERE id = :id" \
-  --param id=123 --json
-
-# 4. Compact output for many flat rows
+  --param id=123 --dry-run
 hexlane db query --app <app> --env <env> --profile <profile> \
-  --sql "SELECT id, created_at, status FROM my_table LIMIT 50" --toon
+  --sql "SELECT * FROM my_table WHERE id = :id" \
+  --param id=123
 
-# 5. API call with full response envelope
+# 4. Use PostgreSQL ::type cast syntax safely alongside :params
+hexlane db query --app <app> --env <env> --profile <profile> \
+  --sql "SELECT id::text, created_at::date FROM orders WHERE status = :status" \
+  --param status=active
+
+# 5. API call — structured envelope { status, headers, body } in TOON by default
 hexlane api call --app <app> --env <env> --profile <profile> \
-  --method GET --path /api/v1/resource --json
+  --method GET --path /api/v1/resource
 
-# 6. Debug a failing command
+# 6. API POST with body
 hexlane api call --app <app> --env <env> --profile <profile> \
-  --method GET --path /api/v1/resource --json --debug
+  --method POST --path /api/v1/resource \
+  --body '{"key": "value"}'
 
-# 7. Force fresh credential after 401
+# 7. Debug a failing command
+hexlane api call --app <app> --env <env> --profile <profile> \
+  --method GET --path /api/v1/resource --debug
+
+# 8. Force fresh credential after 401
 hexlane credential revoke --app <app> --env <env> --profile <profile>
 ```
 
@@ -208,10 +219,13 @@ hexlane credential revoke --app <app> --env <env> --profile <profile>
 
 ## Output Format Guide
 
-| Situation                        | Use                                  |
-| -------------------------------- | ------------------------------------ |
-| Many uniform rows, piping to LLM | `--toon`                             |
-| Nested objects, programmatic use | `--json`                             |
-| Diagnosing HTTP issues           | `--json` (includes status + headers) |
-| Human reading in terminal        | (no flag — pretty JSON)              |
-| Credential / connection issues   | `--debug`                            |
+**TOON is the default output format for all commands.** Use `--json` only when you need JSON specifically.
+
+| Situation                             | Use                                          |
+| ------------------------------------- | -------------------------------------------- |
+| Normal usage (rows, API responses)    | (no flag — TOON is the default)              |
+| Need JSON format explicitly           | `--json`                                     |
+| Checking HTTP status / response shape | (no flag needed — envelope always in output) |
+| Credential / connection issues        | `--debug`                                    |
+| Preview SQL without hitting the DB    | `--dry-run`                                  |
+| Preview op execution without running  | `--dry-run`                                  |

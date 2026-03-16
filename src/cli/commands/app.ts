@@ -69,10 +69,10 @@ export function registerAppCommands(program: Command): void {
                 output({
                     id: config.app.id,
                     description: config.app.description,
-                    environments: config.app.environments.map((env: { name: string; base_url?: string; profiles: Array<{ name: string; kind: string; acquire_strategy: { kind: string }; renewal_policy: unknown }> }) => ({
+                    environments: config.app.environments.map((env) => ({
                         name: env.name,
                         base_url: env.base_url,
-                        profiles: env.profiles.map((p: { name: string; kind: string; acquire_strategy: { kind: string }; renewal_policy: unknown }) => ({
+                        profiles: env.profiles.map((p) => ({
                             name: p.name,
                             kind: p.kind,
                             strategy_kind: p.acquire_strategy.kind,
