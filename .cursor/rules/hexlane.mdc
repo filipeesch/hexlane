@@ -20,12 +20,74 @@ hexlane app show <app-id>
 ```
 
 The `kind` field in `hexlane app show` output determines which command to use:
-- `api_token` → use `hexlane api call`
-- `db_connection` → use `hexlane db query`
+- `api_token` → use `hexlane api call` or `hexlane op run` (if an operation is defined)
+- `db_connection` → use `hexlane db query` or `hexlane op run` (if an operation is defined)
+
+---
+
+## Step 2 — Discover Available Operations (Preferred)
+
+If operations are defined for an app, prefer `op run` over raw `api call` / `db query`. Operations are named, typed, and validated — safer for agents.
+
+```bash
+# List all operations (optionally filter by app or text)
+hexlane op list
+hexlane op list --app <app-id>
+hexlane op list --filter orders
+
+# Show full metadata, parameters, and examples for an operation
+hexlane op show payments-api/get-order
+
+# Dry-run: render the execution template without hitting network or DB
+hexlane op run payments-api/get-order --env dev --profile support-user --param orderId=123 --dry-run
+
+# Run an operation
+hexlane op run payments-api/get-order --env dev --profile support-user --param orderId=123 --json
+```
+
+**Operation names are always app-qualified:** `<app-id>/<operation-name>` (e.g. `payments-api/get-order`).
 
 ---
 
 ## Command Reference
+
+### `hexlane op` — Run and manage named operations (preferred for known tasks)
+
+Operations are named, typed, discoverable actions defined in app configs. They wrap API calls or DB queries with declared parameters, validation, and examples.
+
+```bash
+hexlane op list                              # all operations
+hexlane op list --app <app-id>              # filter by app
+hexlane op list --filter <text>             # grep on name/description/tags
+hexlane op show <app/op>                    # full metadata + parameter table
+hexlane op validate <app/op>               # schema + cross-reference validation
+hexlane op run <app/op> \                  # run the operation
+  --env <env> \
+  --profile <profile> \                    # optional if operation has a default profile
+  --param name=value \                     # repeatable, typed, validated
+  [--dry-run]                              # render template only, no execution
+  [--json] [--toon] [--debug] [--limit N]
+
+# Add an operation to a registered app config
+hexlane op add \
+  --app <app-id> \                         # required
+  --name <name> \                          # required, lowercase alphanumeric-dashes
+  --kind api|db \                          # required
+  --method GET|POST|PUT|PATCH|DELETE \     # required for api
+  --path "/resource/{{ paramName }}" \     # required for api; {{ var }} for templating
+  --sql "SELECT * FROM t WHERE id = :id" \ # required for db
+  --param "name:type:required:description" \ # repeatable; type: string|integer|number|boolean
+                                           # third segment: "required" (default) or "optional"
+                                           # only the literal word "optional" marks a param as not required
+  --profile <profile> \                    # optional default profile
+  --default-env <env> \                    # optional default environment
+  --tag <tag> \                            # repeatable
+  --readonly \                             # api only; db defaults to true
+  --description "..."
+
+# Remove an operation from a registered app config
+hexlane op delete <app-id>/<operation-name>
+```
 
 ### `hexlane db query` — Run a SQL query against a registered database
 
@@ -101,11 +163,12 @@ hexlane app remove <app-id>                   # remove an app
 
 ## Investigation Workflow
 
-1. **Discover** — run `hexlane app list` then `hexlane app show <app-id>` to find the right env and profile.
-2. **Identify** — check the profile `kind`: `db_connection` → use `db query`; `api_token` → use `api call`.
-3. **Query or call** — use `--toon` for many uniform flat rows (token-efficient for LLM context), `--json` for nested data or when you need status + headers.
-4. **Always use `--param`** — never put variable values directly into `--sql`.
-5. **Debug failures** — add `--debug` to see credential state, SQL, and HTTP details. On 401, run `hexlane credential revoke ...` and retry.
+1. **Discover apps** — `hexlane app list` + `hexlane app show <app-id>` to find envs and profiles.
+2. **Discover operations** — `hexlane op list --app <app-id>`. If an operation exists for your task, use it.
+3. **Before running an op** — `hexlane op show <app/op>` to read parameter names/types, then `--dry-run` to confirm the rendered execution before it fires.
+4. **Use `--param` for all variable values** — never interpolate values into `--sql` or paths.
+5. **Output** — `--toon` for many uniform flat rows, `--json` for structured/nested data or when you need status+headers.
+6. **Debug failures** — add `--debug` to trace credential state, SQL, and HTTP details. On 401, run `hexlane credential revoke ...` and retry.
 
 ---
 

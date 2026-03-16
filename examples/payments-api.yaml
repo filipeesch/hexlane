@@ -40,3 +40,41 @@ app:
           renewal_policy:
             ttl: 172800 # 48 hours
             renew_before_expiry: 3600
+
+operations:
+  - name: get-order
+    description: Fetch a single order by ID
+    kind: api
+    profile: support-user
+    defaultEnv: forno
+    tags: [orders, read]
+    readOnly: true
+    parameters:
+      - name: orderId
+        type: string
+        required: true
+        description: Unique order identifier
+    execution:
+      method: GET
+      path: /api/v1/orders/{{ orderId }}
+    examples:
+      - description: Fetch order 123
+        command: hexlane op run payments-api/get-order --env forno --profile support-user --param orderId=123
+
+  - name: find-order-row
+    description: Look up a raw order record from the database by ID
+    kind: db
+    profile: readonly
+    defaultEnv: forno
+    tags: [orders, read, db]
+    readOnly: true
+    parameters:
+      - name: orderId
+        type: integer
+        required: true
+        description: Numeric order primary key
+    execution:
+      sql: "SELECT * FROM orders WHERE id = :orderId"
+    examples:
+      - description: Find order row for id 123
+        command: hexlane op run payments-api/find-order-row --env forno --profile readonly --param orderId=123

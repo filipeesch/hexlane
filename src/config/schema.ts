@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OperationSchema } from "../operations/schema.js";
 
 // ─── Output Mapping ──────────────────────────────────────────────────────────
 
@@ -102,6 +103,7 @@ export const AppConfigSchema = z.object({
         id: z.string().min(1).regex(/^[a-z0-9-]+$/, "App ID must be lowercase alphanumeric with dashes"),
         description: z.string().optional(),
         environments: z.array(EnvironmentSchema).min(1),
+        operations: z.array(OperationSchema).optional(),
     }),
 });
 

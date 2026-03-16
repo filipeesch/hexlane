@@ -38,7 +38,7 @@ export async function executeDbQuery(
     audit: AuditLogger,
     sql: string,
     limit: number = 500,
-    params: Record<string, string> = {},
+    params: Record<string, string | number | boolean> = {},
 ): Promise<DbQueryResult> {
     const secret = vault.read(credential.vault_ref) as DbConnectionSecret;
     if (secret.kind !== "db_connection") {
@@ -51,7 +51,7 @@ export async function executeDbQuery(
     const limitedSql = hasLimit ? normalizedSql : `SELECT * FROM (${normalizedSql}) _q LIMIT ${limit}`;
 
     // Bind :name placeholders → $1, $2, ... using pg parameterized queries (injection-safe)
-    const paramValues: string[] = [];
+    const paramValues: (string | number | boolean)[] = [];
     const paramIndex: Record<string, number> = {};
     const safeSql = limitedSql.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, name: string) => {
         if (!(name in params)) {

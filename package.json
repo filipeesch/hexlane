@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "npx ncc build src/index.ts -o dist --minify",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +33,7 @@
     "@types/pg": "^8.18.0",
     "@vercel/ncc": "^0.38.4",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
   }
 }
