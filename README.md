@@ -247,91 +247,14 @@ cat ./token.jwt | hexlane credential set --app my-app --env production --profile
 
 ## App management
 
-App configs are YAML files that define environments, profiles, and credential acquisition strategies. See [`examples/payments-api.yaml`](examples/payments-api.yaml) for the full schema.
+App configs are YAML files that define environments, profiles, and credential acquisition strategies. See [`examples/my-app.yaml`](examples/my-app.yaml) for a fully annotated starting point.
 
 ```bash
 hexlane app list                               # list all registered apps
 hexlane app show <app-id>                      # full config: envs, profiles, strategies
-hexlane app add --file ./app-config.yaml       # register or update an app from a YAML file
-hexlane app validate --file ./app-config.yaml  # validate without registering
+hexlane app add --file ./my-app.yaml           # register or update an app from a YAML file — see examples/my-app.yaml
+hexlane app validate --file ./my-app.yaml      # validate without registering
 hexlane app remove <app-id>                    # remove an app
-```
-
----
-
-## App Config Schema
-
-```yaml
-version: 1
-app:
-  id: my-app
-  description: "..."
-
-  environments:
-    - name: production
-      base_url: https://api.example.com   # required for api_token profiles
-
-      profiles:
-        # —————————————————————————————————————————————
-        # Option A: automatically fetch a token from an auth endpoint
-        # —————————————————————————————————————————————
-        - name: default
-          kind: api_token
-          acquire_strategy:
-            kind: http             # or shell
-            method: POST
-            url: https://auth.example.com/token
-            output_mapping:
-              kind: api_token
-              token_path: access_token
-          renewal_policy:
-            ttl: 3600
-            renew_before_expiry: 300
-
-        # —————————————————————————————————————————————
-        # Option B: static JWT — token is loaded once via `credential set`
-        # —————————————————————————————————————————————
-        - name: static-service
-          kind: api_token
-          acquire_strategy:
-            kind: static
-          # renewal_policy is optional — expiry is read from JWT exp claim automatically
-
-  operations:
-    - name: get-order
-      kind: api
-      description: Fetch a single order by ID
-      profile: support-user
-      defaultEnv: production
-      tags: [orders, read]
-      parameters:
-        - name: orderId
-          type: string
-          required: true
-          description: Unique order identifier
-      execution:
-        method: GET
-        path: /orders/{{ orderId }}
-```
-
-### Auth injection
-
-By default the token is sent as `Authorization: Bearer <token>`. Override with an `auth:` block on the profile:
-
-```yaml
-# Default — no need to specify
-auth:
-  kind: bearer
-
-# Custom header name (raw token value)
-auth:
-  kind: header
-  name: X-Api-Key
-
-# Query parameter
-auth:
-  kind: query_param
-  name: api_key   # appended as ?api_key=<token>
 ```
 
 ---
