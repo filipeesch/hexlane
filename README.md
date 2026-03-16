@@ -1,19 +1,60 @@
 # hexlane
 
-A secure CLI tool for investigating and testing applications. It manages credentials automatically — fetching, caching, and auto-renewing tokens and database connections — so you never handle secrets manually.
+**hexlane** is interface layer for interacting with external systems through a unified CLI, it can access Web APIs, databases, and more (Kafka support planned). It is designed to be used by humans and AI models alike.
+
+The core idea is a shared library of **named operations**: typed, parameterized actions that any caller — human or AI — can discover and execute against registered systems. An AI model with access to hexlane via MCP or any CLI-capable agent framework can answer questions and perform tasks expressed in natural language, translating them into hexlane commands. The model reasons; hexlane executes, credential-free from the model's perspective.
+
+Two roles work in concert:
+- **Humans** register applications, environments, and credentials — defining what systems can be accessed and how authentication works.
+- **AI agents and humans** operate within that perimeter: listing available operations, composing new ones at runtime with `op add`, and executing them safely with named parameters.
+
+Operations are persistent. Every operation an agent defines becomes a reusable, discoverable building block for future sessions — the agent's operational knowledge compounds over time.
+
+---
+
+## Natural language examples
+
+When hexlane is available as a tool to an AI model, requests expressed in natural language become executable workflows across multiple systems.
+
+**Example 1 — Cross-system investigation**
+> *"Use hexlane to pull the transaction record for TXN-9921 from the database and check its current status on the payments API — I want to know if the two are consistent."*
+
+The agent queries the transactions database for the raw record, calls the payments API with the same transaction ID, and compares the state reported by each system — flagging any discrepancy between them.
+
+**Example 2 — Cross-referencing data across services**
+> *"Use hexlane to get all orders placed in the last 7 days with status failed, then for each one fetch the customer's name and contact email from the customers API and give me a single joined view."*
+
+The agent queries the orders database filtered by date and status, then calls the customers API once per result to fetch the profile. It returns a correlated table — no manual joins, no credential handling.
+
+**Example 3 — Detecting inconsistencies between systems**
+> *"Use hexlane to find all subscription plans marked as inactive in our database that are still showing as available in the billing API — I suspect there's a sync problem."*
+
+The agent queries the database for inactive plans, calls the billing API for each to check visibility, and produces a list of entries that are out of sync across both systems — giving the human a concrete starting point to investigate.
+
+---
 
 ## Features
 
-- **Named operations** — define reusable, typed API / DB actions in app configs; run them with `op run`
-- Authenticated API calls with automatic Bearer token acquisition and renewal
+- **Named operations** — reusable, typed API / DB actions defined in app configs; discoverable and runnable via `op run`
+- **Runtime operation authoring** — create new operations with `op add` without editing files manually; operations persist across sessions
+- Authenticated API calls with automatic token acquisition, caching, and renewal
 - Database queries with named parameters (injection-safe, bound via parameterized queries)
 - Body templating in API operations — use `{{ varName }}` in path, headers, and body
-- Secure credential caching with automatic expiry tracking and renewal
-- Pluggable acquisition strategies: `http` (REST token endpoints), `shell` (arbitrary commands), and `static` (pre-loaded JWT stored in vault)
+- Pluggable credential strategies: `http` (REST token endpoints), `shell` (arbitrary commands), `static` (pre-loaded JWT)
 - JWT `exp` claim detection for accurate token expiry without configuration
-- TOON output by default — compact, token-efficient format; `--json` to override
+- TOON output by default — compact, token-efficient format optimised for AI consumption; `--json` to override
 - `--dry-run` on `op run` and `db query` to preview execution without hitting anything
 - `--debug` flag for tracing credential state, SQL, and HTTP details to stderr
+
+## Security model
+
+Credentials are **never visible to the AI model** or stored in plain text. The vault is the only place secrets live.
+
+- All credentials (tokens, DB passwords) are encrypted with **AES-256-GCM** and stored in `~/.hexlane/vault/` on the local machine
+- The encryption key is derived from a passphrase using **scrypt** (CPU/memory-hard KDF) — the passphrase itself is never written to disk
+- The passphrase is stored in the **OS secret store** after first use: macOS Keychain, Windows Credential Manager, or Linux libsecret (GNOME Keyring / KWallet). In CI or headless environments, set `HEXLANE_VAULT_PASSPHRASE` as an environment variable
+- When an AI model invokes hexlane, it only sees operation output (API responses, query rows) — never the credentials used to obtain them
+- Audit logs record every credential acquisition and API/DB call (credential IDs only, no secret values)
 
 ## Prerequisites
 
@@ -53,6 +94,16 @@ hexlane op run my-app/get-order --env dev --profile support-user --param orderId
 
 Operations are named, typed, discoverable actions defined in app configs. They wrap API calls or DB queries with declared parameters, path/body templating, and optional defaults for env and profile. Prefer `op run` over raw `api call` / `db query` whenever an operation is defined for the task.
 
+Operations can be created and managed entirely through natural language. Tell the AI model what you want to do, and it will define the appropriate operation using `op add` — choosing the right method, path, parameters, and profile. You never need to write the command yourself.
+
+> *"Use hexlane to create an operation that fetches a customer by ID from the customers API using the support profile."*
+> *"Use hexlane to add a DB operation that queries the orders table for all rows with a given status."*
+> *"Use hexlane to remove the create-draft operation from payments-api."*
+
+**Using an OpenAPI spec as context:** If your API has an OpenAPI (Swagger) file, share it with the model. It contains all the paths, methods, parameters, and schemas the model needs to define accurate operations without guessing. You can paste it directly into the conversation or reference it as a file attachment.
+
+**Tip — custom instructions for your editor:** For the best experience, configure your AI assistant (Cursor, GitHub Copilot, or similar) with custom rules that instruct it to always use hexlane when interacting with registered applications. This ensures the model reaches for `op list`, `op run`, and `op add` automatically rather than suggesting raw curl or ad-hoc scripts. See [`examples/hexlane.instructions.md`](examples/hexlane.instructions.md) for a ready-to-use starting point.
+
 ### Discovering and running
 
 ```bash
@@ -78,7 +129,7 @@ Options: `--env`, `--profile`, `--param` (repeatable), `--dry-run`, `--limit N` 
 
 ### Defining operations with `op add`
 
-Operations are stored in the registered app YAML. Use `op add` to append one without editing the file manually.
+Operations are stored in the registered app YAML. Use `op add` to append one without editing the file manually — or simply ask the AI model to do it for you in natural language.
 
 ```bash
 # API operation with path and body templating

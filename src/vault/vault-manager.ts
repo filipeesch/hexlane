@@ -42,8 +42,9 @@ async function tryKeytar(): Promise<typeof import("keytar") | null> {
 /**
  * Resolves the vault passphrase from (in priority order):
  *  1. HEXLANE_VAULT_PASSPHRASE env var  — agent / CI (explicit override)
- *  2. macOS Keychain via keytar         — human dev (transparent, never in env)
- *  3. TTY prompt                        — first-time setup, offers to save to Keychain
+ *  2. OS secret store via keytar        — human dev (transparent, never in env)
+ *     macOS: Keychain, Windows: Credential Manager, Linux: libsecret
+ *  3. TTY prompt                        — first-time setup, offers to save to OS store
  *
  * The passphrase is never written to disk, never in a child process environment,
  * and never visible to agents invoking hexlane commands.
@@ -74,12 +75,12 @@ async function resolvePassphrase(): Promise<string> {
         throw new Error("Passphrase cannot be empty.");
     }
 
-    // Offer to save to keychain so this never needs to be entered again
+    // Offer to save to OS secret store so this never needs to be entered again
     if (keytar) {
-        const save = await promptConfirm("Save passphrase to macOS Keychain? [Y/n]: ");
+        const save = await promptConfirm("Save passphrase to OS secret store? [Y/n]: ");
         if (save) {
             await keytar.setPassword(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT, passphrase);
-            console.error("Passphrase saved to macOS Keychain. You will not be prompted again.");
+            console.error("Passphrase saved to OS secret store. You will not be prompted again.");
         }
     }
 
