@@ -226,10 +226,11 @@ hexlane credential list                                                   # all 
 hexlane credential revoke --app <app> --env <env> --profile <profile>     # force re-acquire on next use (e.g. after 401)
 ```
 
-### Static JWT profiles
+### Static credentials
 
-For APIs that use a long-lived or externally-issued JWT, declare the profile with `acquire_strategy: static` — no URL or command needed. Load the token once using `credential set`; hexlane stores it in the encrypted vault.
+For credentials that are externally managed and can't be fetched automatically, declare the profile with `acquire_strategy: static` and load the value once with `credential set`. hexlane stores it in the encrypted vault.
 
+**API token (JWT or opaque):**
 ```bash
 # Load a token (or rotate it)
 hexlane credential set \
@@ -241,6 +242,18 @@ cat ./token.jwt | hexlane credential set --app my-app --env production --profile
 
 # If the JWT contains an exp claim, expiry is tracked automatically.
 # When it expires, run credential set again with the new token.
+```
+
+**Database connection string:**
+```bash
+# Supported schemes: postgresql, mysql, sqlserver, oracle
+hexlane credential set \
+  --app my-app --env production --profile static-db \
+  --connection-string "postgresql://user:pass@host:5432/dbname?sslmode=require"
+
+# Pull from an environment variable or secret manager to avoid shell history
+hexlane credential set --app my-app --env production --profile static-db \
+  --connection-string "$DATABASE_URL"
 ```
 
 ---

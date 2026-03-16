@@ -8,9 +8,11 @@ export interface ApiTokenSecret {
     vault_lease_id?: string; // e.g. OPA decision_id or Vault lease ID
 }
 
+export type DbEngine = "postgresql" | "mysql" | "sqlserver" | "oracle";
+
 export interface DbConnectionSecret {
     kind: "db_connection";
-    engine: "postgresql";
+    engine: DbEngine;
     host: string;
     port: number;
     user: string;

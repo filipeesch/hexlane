@@ -6,6 +6,11 @@ import { VaultManager } from "../../vault/vault-manager.js";
 import { tryDecodeJwtExp } from "../../strategies/output-mapper.js";
 import type { CredentialRecord } from "../../metadata/store.js";
 
+function defaultPort(engine: string): number {
+    const ports: Record<string, number> = { postgresql: 5432, mysql: 3306, sqlserver: 1433, oracle: 1521 };
+    return ports[engine] ?? 5432;
+}
+
 async function readStdin(): Promise<string> {
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
@@ -149,27 +154,112 @@ export function registerCredentialCommands(program: Command): void {
 
     cred
         .command("set")
-        .description("Store a static JWT/token in the vault for a profile with acquire_strategy: static")
+        .description("Store a static credential in the vault for a profile with acquire_strategy: static")
         .requiredOption("--app <name>", "Application ID")
         .requiredOption("--env <name>", "Environment name")
         .requiredOption("--profile <name>", "Profile name")
-        .option("--token <value>", "Token value (omit to read from stdin)")
+        .option("--token <value>", "(api_token) Token value (omit to read from stdin)")
+        .option("--connection-string <url>", "(db_connection) e.g. postgresql://user:pass@host:5432/dbname?sslmode=require")
         .option("--json", "Output as JSON")
-        .action(async (opts: { app: string; env: string; profile: string; token?: string; json?: boolean }) => {
+        .action(async (opts: { app: string; env: string; profile: string; token?: string; connectionString?: string; json?: boolean }) => {
             if (opts.json) setJsonMode(true);
             try {
                 const ctx = getContext();
 
-                // Validate app/env/profile exists and is a static api_token profile
                 const { profile } = ctx.apps.getProfile(opts.app, opts.env, opts.profile);
-                if (profile.kind !== "api_token") {
-                    die(`Profile "${opts.profile}" is kind "${profile.kind}", not "api_token". Only api_token profiles support credential set.`);
-                }
                 if (profile.acquire_strategy.kind !== "static") {
-                    die(`Profile "${opts.profile}" uses acquire_strategy "${profile.acquire_strategy.kind}", not "static". Only static profiles require manual token loading.`);
+                    die(`Profile "${opts.profile}" uses acquire_strategy "${profile.acquire_strategy.kind}", not "static". Only static profiles require manual credential loading.`);
                 }
 
-                // Get the token value
+                await ctx.vault.unlock();
+
+                const vaultRef = VaultManager.vaultRef(opts.app, opts.env, opts.profile);
+                const now = new Date();
+
+                // ── Static DB connection string ──────────────────────────────────────
+                if (profile.kind === "db_connection") {
+                    if (!opts.connectionString) {
+                        die("Provide --connection-string <url>, e.g. postgresql://user:pass@host:5432/dbname");
+                    }
+
+                    let connUrl: URL;
+                    try {
+                        connUrl = new URL(opts.connectionString);
+                    } catch {
+                        die("Invalid connection string — must be a valid URL, e.g. postgresql://user:pass@host:5432/dbname");
+                        return;
+                    }
+
+                    const schemeToEngine: Record<string, string> = {
+                        postgresql: "postgresql",
+                        postgres: "postgresql",
+                        mysql: "mysql",
+                        sqlserver: "sqlserver",
+                        mssql: "sqlserver",
+                        oracle: "oracle",
+                    };
+                    const scheme = connUrl.protocol.replace(/:$/, "");
+                    const engine = schemeToEngine[scheme];
+                    if (!engine) {
+                        die(`Unsupported scheme "${scheme}" — supported: postgresql, mysql, sqlserver, oracle`);
+                        return;
+                    }
+
+                    const host = connUrl.hostname;
+                    const port = connUrl.port ? parseInt(connUrl.port, 10) : defaultPort(engine);
+                    const user = decodeURIComponent(connUrl.username);
+                    const password = decodeURIComponent(connUrl.password);
+                    const dbname = connUrl.pathname.replace(/^\//, "");
+
+                    if (!host || !user || !password || !dbname) {
+                        die("Connection string must include host, user, password, and database name");
+                    }
+
+                    const rawSslMode = connUrl.searchParams.get("sslmode");
+                    const sslMode = ["disable", "require", "verify-full"].includes(rawSslMode ?? "")
+                        ? (rawSslMode as "disable" | "require" | "verify-full")
+                        : undefined;
+
+                    const expiresAt: string | null = profile.renewal_policy?.ttl
+                        ? new Date(now.getTime() + profile.renewal_policy.ttl * 1000).toISOString()
+                        : null;
+
+                    ctx.vault.write(vaultRef, { kind: "db_connection", engine: engine as import("../../vault/types.js").DbEngine, host, port, user, password, dbname, ssl_mode: sslMode });
+
+                    const existing = ctx.metadata.findByIdentity(opts.app, opts.env, opts.profile);
+                    const dbRecord: CredentialRecord = {
+                        id: existing?.id ?? crypto.randomUUID(),
+                        app: opts.app,
+                        env: opts.env,
+                        profile: opts.profile,
+                        kind: "db_connection",
+                        status: "active",
+                        renewable: false,
+                        vault_ref: vaultRef,
+                        created_at: existing?.created_at ?? now.toISOString(),
+                        updated_at: now.toISOString(),
+                        expires_at: expiresAt,
+                        last_used_at: null,
+                        db_host: host,
+                        db_name: dbname,
+                        db_engine: engine,
+                    };
+                    ctx.metadata.upsert(dbRecord);
+
+                    output({
+                        message: `Credential stored for ${opts.app}/${opts.env}/${opts.profile}`,
+                        engine,
+                        host,
+                        port,
+                        user,
+                        dbname,
+                        ssl_mode: sslMode ?? "default",
+                        expires_at: expiresAt ?? "no expiry",
+                    });
+                    return;
+                }
+
+                // ── Static API token ─────────────────────────────────────────────────
                 let token: string;
                 if (opts.token) {
                     token = opts.token.trim();
@@ -180,11 +270,6 @@ export function registerCredentialCommands(program: Command): void {
                     token = (await readStdin()).trim();
                 }
                 if (!token) die("Token cannot be empty");
-
-                await ctx.vault.unlock();
-
-                const vaultRef = VaultManager.vaultRef(opts.app, opts.env, opts.profile);
-                const now = new Date();
 
                 // Parse JWT exp claim for expiry tracking; fall back to renewal_policy.ttl
                 const jwtExpiry = tryDecodeJwtExp(token);

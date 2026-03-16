@@ -36,7 +36,17 @@ app:
           #   kind: query_param
           #   name: api_key
 
-        # ─── Option C: database connection via shell command ────────────────────
+        # ─── Option C: static DB connection — loaded once via `hexlane credential set` ───
+        - name: static-db
+          kind: db_connection
+          acquire_strategy:
+            kind: static
+          # Load with:
+          #   hexlane credential set --app my-app --env production --profile static-db \
+          #     --connection-string "postgresql://user:pass@host:5432/dbname?sslmode=require"
+          # Supported schemes: postgresql, mysql, sqlserver, oracle
+
+        # ─── Option D: database connection via shell command ────────────────────
         - name: readonly
           kind: db_connection
           acquire_strategy:
