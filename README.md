@@ -96,6 +96,7 @@ No vault passphrase, no `credential set`, no token needed — the `public` profi
 - **AES-256-GCM vault** — all secrets encrypted at rest; passphrase managed by OS keychain
 - **Structured audit log** — every credential acquisition and API/DB call recorded (credential IDs only, no secret values)
 - **AI-friendly** — `op discover`, `op list`, `op show` designed for model consumption; operations compound over time
+- **Credential isolation** — credentials are never exposed to the AI model; the model only sees operation output
 
 **Tip — custom instructions for your editor:** See [`examples/hexlane.instructions.md`](examples/hexlane.instructions.md) for a ready-to-use snippet that instructs your AI assistant to reach for hexlane automatically instead of suggesting raw curl or ad-hoc scripts.
 
@@ -103,11 +104,11 @@ No vault passphrase, no `credential set`, no token needed — the `public` profi
 
 ## Documentation
 
-| Topic | Description |
-|---|---|
-| [Operations](docs/operations.md) | Define, discover, and run named operations; template syntax; AI tips |
+| Topic                              | Description                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| [Operations](docs/operations.md)   | Define, discover, and run named operations; template syntax; AI tips           |
 | [Credentials](docs/credentials.md) | Credential lifecycle, static tokens, static DB connections, vault architecture |
-| [App Config](docs/app-config.md) | Full YAML schema reference — all profile kinds, strategies, auth injection |
-| [API & DB](docs/api-db.md) | Raw `api call` and `db query` reference |
+| [App Config](docs/app-config.md)   | Full YAML schema reference — all profile kinds, strategies, auth injection     |
+| [API & DB](docs/api-db.md)         | Raw `api call` and `db query` reference                                        |
 
 ---

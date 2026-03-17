@@ -156,20 +156,20 @@ profiles:
 
 `output_mapping` fields for `db_connection`:
 
-| Field | Description |
-|---|---|
-| `host_path` | JSON path to hostname |
-| `port_path` | JSON path to port number |
-| `user_path` | JSON path to username |
-| `password_path` | JSON path to password |
-| `dbname_path` | JSON path to database name |
-| `auth_token_path` | JSON path to auth token (e.g. AWS RDS IAM token) |
-| `auth_token_value: raw` | Entire output is a raw auth token string (not JSON) |
-| `expires_at_path` | JSON path to expiry timestamp |
-| `lease_id_path` | JSON path to lease/decision ID |
-| `unwrap_array` | `true` to unwrap single-element array output |
-| `host`, `user`, `dbname`, `ssl_mode`, `port` | Static overrides applied after path extraction |
-| `error_path`, `trace_id_path` | Error message and trace ID paths for diagnostics |
+| Field                                        | Description                                         |
+| -------------------------------------------- | --------------------------------------------------- |
+| `host_path`                                  | JSON path to hostname                               |
+| `port_path`                                  | JSON path to port number                            |
+| `user_path`                                  | JSON path to username                               |
+| `password_path`                              | JSON path to password                               |
+| `dbname_path`                                | JSON path to database name                          |
+| `auth_token_path`                            | JSON path to auth token (e.g. AWS RDS IAM token)    |
+| `auth_token_value: raw`                      | Entire output is a raw auth token string (not JSON) |
+| `expires_at_path`                            | JSON path to expiry timestamp                       |
+| `lease_id_path`                              | JSON path to lease/decision ID                      |
+| `unwrap_array`                               | `true` to unwrap single-element array output        |
+| `host`, `user`, `dbname`, `ssl_mode`, `port` | Static overrides applied after path extraction      |
+| `error_path`, `trace_id_path`                | Error message and trace ID paths for diagnostics    |
 
 ---
 

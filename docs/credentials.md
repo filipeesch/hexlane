@@ -83,12 +83,12 @@ hexlane credential set --app my-app --env production --profile static-db \
 
 The connection string is parsed and broken into discrete fields (host, port, user, password, dbname, ssl_mode) before being stored encrypted. The scheme determines the engine:
 
-| Scheme | Engine |
-|---|---|
+| Scheme                           | Engine     |
+| -------------------------------- | ---------- |
 | `postgresql://` or `postgres://` | PostgreSQL |
-| `mysql://` | MySQL |
-| `sqlserver://` or `mssql://` | SQL Server |
-| `oracle://` | Oracle |
+| `mysql://`                       | MySQL      |
+| `sqlserver://` or `mssql://`     | SQL Server |
+| `oracle://`                      | Oracle     |
 
 `?sslmode=` is parsed from the query string — accepted values: `disable`, `require`, `verify-full`.
 

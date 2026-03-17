@@ -16,14 +16,14 @@ hexlane api call <app-id> <path> [options]
 
 ### Options
 
-| Flag | Description |
-|---|---|
-| `-e, --env <env>` | Environment (default: first defined) |
-| `-p, --profile <profile>` | Profile override (default: first defined) |
-| `-m, --method <method>` | HTTP method (default: `GET`) |
-| `-H, --header <header>` | Add request header — repeatable: `-H "X-Foo: bar"` |
-| `-b, --body <body>` | Request body string |
-| `--json` | Output raw JSON instead of TOON |
+| Flag                      | Description                                        |
+| ------------------------- | -------------------------------------------------- |
+| `-e, --env <env>`         | Environment (default: first defined)               |
+| `-p, --profile <profile>` | Profile override (default: first defined)          |
+| `-m, --method <method>`   | HTTP method (default: `GET`)                       |
+| `-H, --header <header>`   | Add request header — repeatable: `-H "X-Foo: bar"` |
+| `-b, --body <body>`       | Request body string                                |
+| `--json`                  | Output raw JSON instead of TOON                    |
 
 ### Response envelope
 
@@ -80,16 +80,16 @@ SQL is provided via `--sql` or `--sql-file`. Named parameters are bound with `:n
 
 ### Options
 
-| Flag | Description |
-|---|---|
-| `-e, --env <env>` | Environment (default: first defined) |
-| `-p, --profile <profile>` | Profile override (default: first defined) |
-| `-s, --sql <sql>` | SQL statement |
-| `-f, --sql-file <path>` | Path to a `.sql` file |
-| `--param <name=value>` | Bind a named parameter — repeatable |
-| `--limit <n>` | Append `LIMIT n` to the query |
-| `--dry-run` | Print the resolved SQL and parameters without executing |
-| `--json` | Output raw JSON instead of TOON |
+| Flag                      | Description                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `-e, --env <env>`         | Environment (default: first defined)                    |
+| `-p, --profile <profile>` | Profile override (default: first defined)               |
+| `-s, --sql <sql>`         | SQL statement                                           |
+| `-f, --sql-file <path>`   | Path to a `.sql` file                                   |
+| `--param <name=value>`    | Bind a named parameter — repeatable                     |
+| `--limit <n>`             | Append `LIMIT n` to the query                           |
+| `--dry-run`               | Print the resolved SQL and parameters without executing |
+| `--json`                  | Output raw JSON instead of TOON                         |
 
 ### Named parameters
 
@@ -172,10 +172,10 @@ hexlane db query my-app --sql "SELECT id, name FROM products" --json | jq '[.[].
 
 ## When to use raw commands vs operations
 
-| Scenario | Recommendation |
-|---|---|
-| Exploring an API or schema | `api call` / `db query` |
-| One-off debug request | `api call` / `db query` |
-| Repeatable workflow | Define an operation — use `op run` |
-| Shared with team, needs docs | Define an operation with `description`, `examples` |
-| AI-assisted discovery | Operations are discoverable — `op discover` works on them |
+| Scenario                     | Recommendation                                            |
+| ---------------------------- | --------------------------------------------------------- |
+| Exploring an API or schema   | `api call` / `db query`                                   |
+| One-off debug request        | `api call` / `db query`                                   |
+| Repeatable workflow          | Define an operation — use `op run`                        |
+| Shared with team, needs docs | Define an operation with `description`, `examples`        |
+| AI-assisted discovery        | Operations are discoverable — `op discover` works on them |

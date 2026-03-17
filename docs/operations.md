@@ -56,15 +56,15 @@ hexlane op run my-app/get-account --param id=123 --debug
 
 **Options:**
 
-| Flag | Description |
-|---|---|
-| `--env <name>` | Override environment (required if no `defaultEnv`) |
-| `--profile <name>` | Override profile (required if no default `profile`) |
-| `--param key=value` | Parameter value — repeatable |
-| `--dry-run` | Render templates and print plan, no execution |
-| `--limit <n>` | Max rows for DB operations (default: 500) |
-| `--json` | Output as JSON instead of TOON |
-| `--debug` | Log credential state, SQL, and HTTP details to stderr |
+| Flag                | Description                                           |
+| ------------------- | ----------------------------------------------------- |
+| `--env <name>`      | Override environment (required if no `defaultEnv`)    |
+| `--profile <name>`  | Override profile (required if no default `profile`)   |
+| `--param key=value` | Parameter value — repeatable                          |
+| `--dry-run`         | Render templates and print plan, no execution         |
+| `--limit <n>`       | Max rows for DB operations (default: 500)             |
+| `--json`            | Output as JSON instead of TOON                        |
+| `--debug`           | Log credential state, SQL, and HTTP details to stderr |
 
 ---
 
@@ -133,12 +133,12 @@ SQL uses `:name` placeholders — injection-safe, bound via parameterized querie
 name:type:required_or_optional:description
 ```
 
-| Segment | Values |
-|---|---|
-| `name` | Alphanumeric + underscore, e.g. `orderId` |
-| `type` | `string` (default), `integer`, `number`, `boolean` |
-| third | `required` (default) or `optional` |
-| description | Free text, may contain colons |
+| Segment     | Values                                             |
+| ----------- | -------------------------------------------------- |
+| `name`      | Alphanumeric + underscore, e.g. `orderId`          |
+| `type`      | `string` (default), `integer`, `number`, `boolean` |
+| third       | `required` (default) or `optional`                 |
+| description | Free text, may contain colons                      |
 
 Examples:
 ```
