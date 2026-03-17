@@ -1,0 +1,129 @@
+version: 1
+app:
+  id: github
+  description: "GitHub REST API — public endpoints, no authentication required"
+
+  environments:
+    - name: public
+      base_url: https://api.github.com
+
+      profiles:
+        - name: public
+          kind: public
+
+  operations:
+    # ── User ────────────────────────────────────────────────────────────────────
+    - name: get-user
+      kind: api
+      description: Fetch a public GitHub user profile
+      profile: public
+      defaultEnv: public
+      tags: [users, read]
+      readOnly: true
+      parameters:
+        - name: username
+          type: string
+          required: true
+          description: GitHub username
+      execution:
+        method: GET
+        path: /users/{{ username }}
+      examples:
+        - description: Fetch the torvalds profile
+          command: hexlane op run github/get-user --param username=torvalds
+
+    # ── Repository ───────────────────────────────────────────────────────────────
+    - name: get-repo
+      kind: api
+      description: Fetch metadata for a public repository
+      profile: public
+      defaultEnv: public
+      tags: [repos, read]
+      readOnly: true
+      parameters:
+        - name: owner
+          type: string
+          required: true
+          description: Repository owner (user or org)
+        - name: repo
+          type: string
+          required: true
+          description: Repository name
+      execution:
+        method: GET
+        path: /repos/{{ owner }}/{{ repo }}
+      examples:
+        - description: Fetch the linux kernel repo
+          command: hexlane op run github/get-repo --param owner=torvalds --param repo=linux
+
+    # ── Issues ───────────────────────────────────────────────────────────────────
+    - name: list-issues
+      kind: api
+      description: List issues for a public repository, with optional filters
+      profile: public
+      defaultEnv: public
+      tags: [repos, issues, read]
+      readOnly: true
+      parameters:
+        - name: owner
+          type: string
+          required: true
+          description: Repository owner
+        - name: repo
+          type: string
+          required: true
+          description: Repository name
+        - name: state
+          type: string
+          required: false
+          description: "Filter by state: open (default), closed, or all"
+        - name: labels
+          type: string
+          required: false
+          description: Comma-separated list of label names to filter by
+        - name: perPage
+          type: integer
+          required: false
+          description: Number of results per page (max 100, default 30)
+      execution:
+        method: GET
+        path: /repos/{{ owner }}/{{ repo }}/issues
+        query:
+          state: "{{ state }}"
+          labels: "{{ labels }}"
+          per_page: "{{ perPage }}"
+      examples:
+        - description: List open issues in the hexlane repo
+          command: hexlane op run github/list-issues --param owner=filipeesch --param repo=hexlane
+        - description: List closed bug issues, 50 per page
+          command: hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=closed --param labels=bug --param perPage=50
+
+    # ── Contributors ─────────────────────────────────────────────────────────────
+    - name: list-contributors
+      kind: api
+      description: List contributors for a public repository, sorted by commit count
+      profile: public
+      defaultEnv: public
+      tags: [repos, contributors, read]
+      readOnly: true
+      parameters:
+        - name: owner
+          type: string
+          required: true
+          description: Repository owner
+        - name: repo
+          type: string
+          required: true
+          description: Repository name
+        - name: perPage
+          type: integer
+          required: false
+          description: Number of results per page (max 100, default 30)
+      execution:
+        method: GET
+        path: /repos/{{ owner }}/{{ repo }}/contributors
+        query:
+          per_page: "{{ perPage }}"
+      examples:
+        - description: Top contributors to the linux kernel
+          command: hexlane op run github/list-contributors --param owner=torvalds --param repo=linux --param perPage=10

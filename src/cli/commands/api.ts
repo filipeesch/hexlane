@@ -54,8 +54,8 @@ export function registerApiCommands(program: Command): void {
                 await ctx.vault.unlock();
 
                 const { env, profile } = ctx.apps.getProfile(opts.app, opts.env, opts.profile);
-                if (profile.kind !== "api_token") {
-                    die(`Profile "${opts.profile}" is kind "${profile.kind}", not "api_token"`);
+                if (profile.kind !== "api_token" && profile.kind !== "public") {
+                    die(`Profile "${opts.profile}" is kind "${profile.kind}", not "api_token" or "public"`);
                 }
                 if (!env.base_url) {
                     die(`Environment "${opts.env}" has no base_url configured`);
@@ -67,7 +67,7 @@ export function registerApiCommands(program: Command): void {
                     path: opts.path,
                     body,
                     baseUrl: env.base_url,
-                    auth: profile.auth,
+                    auth: profile.kind === "api_token" ? profile.auth : undefined,
                 });
 
                 output({ status: result.status, headers: result.headers, body: result.body });

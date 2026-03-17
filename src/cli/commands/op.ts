@@ -234,6 +234,7 @@ export function registerOpCommands(program: Command): void {
                             method: rendered.method,
                             path: rendered.path,
                         };
+                        if (rendered.query) plan["query"] = rendered.query;
                         if (rendered.headers) plan["headers"] = rendered.headers;
                         if (rendered.body) plan["body"] = rendered.body;
                         output(plan);
@@ -257,8 +258,8 @@ export function registerOpCommands(program: Command): void {
                 const { env, profile } = ctx.apps.getProfile(entry.appId, envName, profileName);
 
                 if (operation.kind === "api") {
-                    if (profile.kind !== "api_token") {
-                        die(`Profile "${profileName}" is kind "${profile.kind}", not "api_token". Use an api_token profile for API operations.`);
+                    if (profile.kind !== "api_token" && profile.kind !== "public") {
+                        die(`Profile "${profileName}" is kind "${profile.kind}", not "api_token" or "public". Use an api_token or public profile for API operations.`);
                     }
                     if (!env.base_url) {
                         die(`Environment "${envName}" has no base_url configured.`);
@@ -270,9 +271,10 @@ export function registerOpCommands(program: Command): void {
                     const result = await executeApiCall(ctx.vault, credential, ctx.audit, {
                         method: rendered.method,
                         path: rendered.path,
+                        query: rendered.query,
                         body: rendered.body,
                         baseUrl: env.base_url,
-                        auth: profile.auth,
+                        auth: profile.kind === "api_token" ? profile.auth : undefined,
                     });
 
                     output({ status: result.status, headers: result.headers, body: result.body });
@@ -286,7 +288,7 @@ export function registerOpCommands(program: Command): void {
                     const credential = await ctx.resolver.resolve(entry.appId, envName, profile);
                     const result = await executeDbQuery(
                         ctx.vault,
-                        credential,
+                        credential!,
                         ctx.audit,
                         rendered.sql,
                         opts.limit ?? 500,

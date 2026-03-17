@@ -108,7 +108,14 @@ const RenewalPolicySchema = z.object({
 
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
-const ProfileSchema = z.object({
+// Public profile — no authentication, no vault, no credential acquisition.
+// Used for open APIs that require no token (e.g. GitHub public endpoints).
+const PublicProfileSchema = z.object({
+    name: z.string().min(1).regex(/^[a-z0-9-]+$/, "Profile name must be lowercase alphanumeric with dashes"),
+    kind: z.literal("public"),
+});
+
+const AuthenticatedProfileSchema = z.object({
     name: z.string().min(1).regex(/^[a-z0-9-]+$/, "Profile name must be lowercase alphanumeric with dashes"),
     kind: z.enum(["api_token", "db_connection"]),
     acquire_strategy: StrategySchema,
@@ -125,6 +132,8 @@ const ProfileSchema = z.object({
     },
     { message: "output_mapping.kind must match profile kind" }
 );
+
+const ProfileSchema = z.union([PublicProfileSchema, AuthenticatedProfileSchema]);
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -148,6 +157,8 @@ export const AppConfigSchema = z.object({
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
 export type Profile = z.infer<typeof ProfileSchema>;
+export type PublicProfile = z.infer<typeof PublicProfileSchema>;
+export type AuthenticatedProfile = z.infer<typeof AuthenticatedProfileSchema>;
 export type Environment = z.infer<typeof EnvironmentSchema>;
 export type Strategy = z.infer<typeof StrategySchema>;
 export type ShellStrategy = z.infer<typeof ShellStrategySchema>;

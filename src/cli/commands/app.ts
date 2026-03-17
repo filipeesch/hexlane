@@ -75,8 +75,8 @@ export function registerAppCommands(program: Command): void {
                         profiles: env.profiles.map((p) => ({
                             name: p.name,
                             kind: p.kind,
-                            strategy_kind: p.acquire_strategy.kind,
-                            renewal_policy: p.renewal_policy,
+                            strategy_kind: p.kind === "public" ? "public" : p.acquire_strategy.kind,
+                            renewal_policy: p.kind === "public" ? null : p.renewal_policy,
                         })),
                     })),
                 });

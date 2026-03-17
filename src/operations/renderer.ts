@@ -45,6 +45,7 @@ export function extractTemplateVars(template: string): string[] {
 export interface RenderedApiExecution {
     method: string;
     path: string;
+    query?: Record<string, string>;
     headers?: Record<string, string>;
     body?: string;
 }
@@ -54,6 +55,14 @@ export function renderApiExecution(
     params: ResolvedParams,
 ): RenderedApiExecution {
     const path = renderTemplate(exec.path, params);
+
+    let query: Record<string, string> | undefined;
+    if (exec.query) {
+        query = {};
+        for (const [k, v] of Object.entries(exec.query)) {
+            query[k] = renderTemplate(v, params);
+        }
+    }
 
     let headers: Record<string, string> | undefined;
     if (exec.headers) {
@@ -68,7 +77,7 @@ export function renderApiExecution(
         body = renderTemplate(exec.body, params);
     }
 
-    return { method: exec.method, path, headers, body };
+    return { method: exec.method, path, query, headers, body };
 }
 
 // ─── DB Execution Renderer ───────────────────────────────────────────────────

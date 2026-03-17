@@ -1,5 +1,5 @@
 import * as crypto from "crypto";
-import type { Profile } from "../config/schema.js";
+import type { Profile, AuthenticatedProfile } from "../config/schema.js";
 import { VaultManager } from "../vault/vault-manager.js";
 import { MetadataStore, type CredentialRecord } from "../metadata/store.js";
 import { LockManager } from "./lock-manager.js";
@@ -24,11 +24,14 @@ export class CredentialResolver {
         app: string,
         env: string,
         profile: Profile,
-    ): Promise<CredentialRecord> {
+    ): Promise<CredentialRecord | null> {
+        // Public profiles need no credential — callers receive null and skip vault.
+        if (profile.kind === "public") return null;
+
         const existing = this.metadata.findByIdentity(app, env, profile.name);
 
         if (existing && existing.status === "active") {
-            if (this.needsRenewal(existing, profile)) {
+            if (this.needsRenewal(existing, profile as AuthenticatedProfile)) {
                 if (profile.acquire_strategy.kind === "static") {
                     throw new Error(
                         `Static credential for ${app}/${env}/${profile.name} has expired. ` +
@@ -36,7 +39,7 @@ export class CredentialResolver {
                     );
                 }
                 debugLog(`credential`, `renewing ${app}/${env}/${profile.name} (expires ${existing.expires_at})`);
-                return this.renew(app, env, profile, existing);
+                return this.renew(app, env, profile as AuthenticatedProfile, existing);
             }
             debugLog(`credential`, `cache hit for ${app}/${env}/${profile.name} (expires ${existing.expires_at})`);
             this.metadata.touchLastUsed(existing.id);
@@ -51,10 +54,10 @@ export class CredentialResolver {
         }
 
         debugLog(`credential`, `acquiring new credential for ${app}/${env}/${profile.name}`);
-        return this.acquire(app, env, profile);
+        return this.acquire(app, env, profile as AuthenticatedProfile);
     }
 
-    private needsRenewal(record: CredentialRecord, profile: Profile): boolean {
+    private needsRenewal(record: CredentialRecord, profile: AuthenticatedProfile): boolean {
         if (!record.expires_at) return false;
         const renewBeforeMs = (profile.renewal_policy?.renew_before_expiry ?? 300) * 1000;
         const expiresAt = new Date(record.expires_at).getTime();
@@ -64,7 +67,7 @@ export class CredentialResolver {
     private async acquire(
         app: string,
         env: string,
-        profile: Profile,
+        profile: AuthenticatedProfile,
     ): Promise<CredentialRecord> {
         const vaultRef = VaultManager.vaultRef(app, env, profile.name);
         await this.locks.acquire(vaultRef);
@@ -132,7 +135,7 @@ export class CredentialResolver {
     private async renew(
         app: string,
         env: string,
-        profile: Profile,
+        profile: AuthenticatedProfile,
         existing: CredentialRecord,
     ): Promise<CredentialRecord> {
         const vaultRef = existing.vault_ref;

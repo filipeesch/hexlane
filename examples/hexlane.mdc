@@ -20,6 +20,7 @@ hexlane app show <app-id>
 ```
 
 The `kind` field in `hexlane app show` output determines which command to use:
+- `public` → use `hexlane api call` or `hexlane op run` — no credentials needed
 - `api_token` → use `hexlane api call` or `hexlane op run` (if an operation is defined)
 - `db_connection` → use `hexlane db query` or `hexlane op run` (if an operation is defined)
 
@@ -36,16 +37,16 @@ hexlane op list --app <app-id>
 hexlane op list --filter orders
 
 # Show full metadata, parameters, and examples for an operation
-hexlane op show payments-api/get-order
+hexlane op show github/get-user
 
 # Dry-run: render the execution template without hitting network or DB
-hexlane op run payments-api/get-order --env dev --profile support-user --param orderId=123 --dry-run
+hexlane op run github/list-issues --param owner=torvalds --param repo=linux --dry-run
 
 # Run an operation (output is TOON by default; pass --json to get JSON)
-hexlane op run payments-api/get-order --env dev --profile support-user --param orderId=123
+hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=open
 ```
 
-**Operation names are always app-qualified:** `<app-id>/<operation-name>` (e.g. `payments-api/get-order`).
+**Operation names are always app-qualified:** `<app-id>/<operation-name>` (e.g. `github/get-user`).
 
 ---
 

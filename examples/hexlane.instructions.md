@@ -12,6 +12,11 @@ Copy the content below into your instructions file:
 
 You have access to **hexlane**, a CLI tool that provides a unified interface to external systems — REST APIs, databases, and more. Use hexlane for all interactions with registered applications instead of writing raw curl commands, ad-hoc scripts, or direct SQL strings.
 
+Profiles can be:
+- `public` — no authentication needed; hexlane calls the API directly with no token
+- `api_token` — token is fetched, cached, and renewed automatically
+- `db_connection` — DB credentials are fetched, cached, and renewed automatically
+
 ### Discovering what's available
 
 Before performing any task against an external system, always discover first:

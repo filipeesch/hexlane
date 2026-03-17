@@ -8,9 +8,10 @@ import { debugLog } from "../cli/debug.js";
 interface ApiCallOptions {
     method: string;
     path: string;
+    query?: Record<string, string>;  // rendered query params (empty values omitted)
     body?: string;
     baseUrl: string;
-    // How the token is injected. Defaults to Bearer if omitted.
+    // How the token is injected. Omit entirely for public profiles.
     auth?: Auth;
 }
 
@@ -22,32 +23,43 @@ export interface ApiCallResult {
 
 export async function executeApiCall(
     vault: VaultManager,
-    credential: CredentialRecord,
+    credential: CredentialRecord | null,
     audit: AuditLogger,
     options: ApiCallOptions,
 ): Promise<ApiCallResult> {
-    const secret = vault.read(credential.vault_ref) as ApiTokenSecret;
-    if (secret.kind !== "api_token") {
-        throw new Error(`Credential is not an API token (kind: ${secret.kind})`);
-    }
-
     // Build URL — base_url + path
     let url = options.baseUrl.replace(/\/$/, "") + "/" + options.path.replace(/^\//, "");
+
+    // Append rendered query params (skip empty values)
+    if (options.query) {
+        const qs = Object.entries(options.query)
+            .filter(([, v]) => v !== "" && v !== undefined)
+            .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+            .join("&");
+        if (qs) url += (url.includes("?") ? "&" : "?") + qs;
+    }
+
     debugLog(`api call`, `${options.method.toUpperCase()} ${url}`);
 
-    // Inject auth based on configured mode (defaults to Bearer)
     const requestHeaders: Record<string, string> = {
         "Content-Type": "application/json",
         Accept: "application/json",
     };
-    const auth = options.auth;
-    if (!auth || auth.kind === "bearer") {
-        requestHeaders["Authorization"] = `Bearer ${secret.token}`;
-    } else if (auth.kind === "header") {
-        requestHeaders[auth.name] = secret.token;
-    } else if (auth.kind === "query_param") {
-        const separator = url.includes("?") ? "&" : "?";
-        url += `${separator}${encodeURIComponent(auth.name)}=${encodeURIComponent(secret.token)}`;
+
+    if (credential !== null) {
+        const secret = vault.read(credential.vault_ref) as ApiTokenSecret;
+        if (secret.kind !== "api_token") {
+            throw new Error(`Credential is not an API token (kind: ${secret.kind})`);
+        }
+        const auth = options.auth;
+        if (!auth || auth.kind === "bearer") {
+            requestHeaders["Authorization"] = `Bearer ${secret.token}`;
+        } else if (auth.kind === "header") {
+            requestHeaders[auth.name] = secret.token;
+        } else if (auth.kind === "query_param") {
+            const separator = url.includes("?") ? "&" : "?";
+            url += `${separator}${encodeURIComponent(auth.name)}=${encodeURIComponent(secret.token)}`;
+        }
     }
 
     const response = await fetch(url, {
@@ -74,11 +86,11 @@ export async function executeApiCall(
 
     audit.log({
         event: "api_call_executed",
-        app: credential.app,
-        env: credential.env,
-        profile: credential.profile,
+        app: credential?.app ?? "public",
+        env: credential?.env ?? "public",
+        profile: credential?.profile ?? "public",
         status: response.ok ? "ok" : "error",
-        credential_id: credential.id,
+        credential_id: credential?.id ?? undefined,
         method: options.method.toUpperCase(),
         path: options.path,
         http_status: response.status,

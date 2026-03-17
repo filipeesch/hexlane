@@ -142,10 +142,10 @@ export function registerCredentialCommands(program: Command): void {
                 const record = await ctx.resolver.resolve(opts.app, opts.env, profile);
                 output({
                     message: "Credential renewed",
-                    app: record.app,
-                    env: record.env,
-                    profile: record.profile,
-                    expires_at: record.expires_at,
+                    app: record!.app,
+                    env: record!.env,
+                    profile: record!.profile,
+                    expires_at: record!.expires_at,
                 });
             } catch (e: unknown) {
                 die((e as Error).message);
@@ -167,6 +167,9 @@ export function registerCredentialCommands(program: Command): void {
                 const ctx = getContext();
 
                 const { profile } = ctx.apps.getProfile(opts.app, opts.env, opts.profile);
+                if (profile.kind === "public") {
+                    die(`Profile "${opts.profile}" is kind "public" — public profiles need no credential.`);
+                }
                 if (profile.acquire_strategy.kind !== "static") {
                     die(`Profile "${opts.profile}" uses acquire_strategy "${profile.acquire_strategy.kind}", not "static". Only static profiles require manual credential loading.`);
                 }

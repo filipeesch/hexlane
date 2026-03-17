@@ -2,7 +2,7 @@
 
 **hexlane** is interface layer for interacting with external systems through a unified CLI, it can access Web APIs, databases, and more (Kafka support planned). It is designed to be used by humans and AI models alike.
 
-The core idea is a shared library of **named operations**: typed, parameterized actions that any caller — human or AI — can discover and execute against registered systems. An AI model with access to hexlane via MCP or any CLI-capable agent framework can answer questions and perform tasks expressed in natural language, translating them into hexlane commands. The model reasons; hexlane executes, credential-free from the model's perspective.
+The core idea is a shared library of **named operations**: typed, parameterized actions that any caller — human or AI — can discover and execute against registered systems. An AI model with access to terminal can answer questions and perform tasks expressed in natural language, translating them into hexlane commands. The model reasons; hexlane executes, credential-free from the model's perspective.
 
 Two roles work in concert:
 - **Humans** register applications, environments, and credentials — defining what systems can be accessed and how authentication works.
@@ -33,19 +33,6 @@ The agent queries the database for inactive plans, calls the billing API for eac
 
 ---
 
-## Features
-
-- **Named operations** — reusable, typed API / DB actions defined in app configs; discoverable and runnable via `op run`
-- **Runtime operation authoring** — create new operations with `op add` without editing files manually; operations persist across sessions
-- Authenticated API calls with automatic token acquisition, caching, and renewal
-- Database queries with named parameters (injection-safe, bound via parameterized queries)
-- Body templating in API operations — use `{{ varName }}` in path, headers, and body
-- Pluggable credential strategies: `http` (REST token endpoints), `shell` (arbitrary commands), `static` (pre-loaded JWT)
-- JWT `exp` claim detection for accurate token expiry without configuration
-- TOON output by default — compact, token-efficient format optimised for AI consumption; `--json` to override
-- `--dry-run` on `op run` and `db query` to preview execution without hitting anything
-- `--debug` flag for tracing credential state, SQL, and HTTP details to stderr
-
 ## Security model
 
 Credentials are **never visible to the AI model** or stored in plain text. The vault is the only place secrets live.
@@ -73,20 +60,28 @@ npm link        # installs the `hexlane` binary globally via npm link
 
 ## Quick Start
 
+The fastest way to try hexlane is with the GitHub example — it uses public endpoints, so no credentials or setup are needed.
+
 ```bash
-# 1. Register an app
-hexlane app add --file ./my-app.yaml # see examples/my-app.yaml
+# 1. Register the GitHub app (operations are baked in)
+hexlane app add --file examples/github.yaml
 
-# 2. Discover what's available
-hexlane app list
-hexlane app show my-app
+# 2. See what operations are available
+hexlane op list --app github
 
-# 3. Check if named operations exist (use them if they do)
-hexlane op list --app my-app
+# 3. Preview a request before running it
+hexlane op run github/get-user --param username=torvalds --dry-run
 
-# 4. Run an operation
-hexlane op run my-app/get-order --env dev --profile support-user --param orderId=123
+# 4. Run it
+hexlane op run github/get-user --param username=torvalds
+
+# 5. Use filters — list open issues, 10 per page
+hexlane op run github/list-issues \
+  --param owner=torvalds --param repo=linux \
+  --param state=open --param perPage=10
 ```
+
+No vault passphrase, no `credential set`, no token needed — the `public` profile bypasses auth entirely.
 
 ---
 
@@ -96,7 +91,7 @@ Operations are named, typed, discoverable actions defined in app configs. They w
 
 Operations can be created and managed entirely through natural language. Tell the AI model what you want to do, and it will define the appropriate operation using `op add` — choosing the right method, path, parameters, and profile. You never need to write the command yourself.
 
-> *"Use hexlane to create an operation that fetches a customer by ID from the customers API using the support profile."*
+> *"Use hexlane to create an operation that fetches a user profile from the GitHub API."*
 > *"Use hexlane to add a DB operation that queries the orders table for all rows with a given status."*
 > *"Use hexlane to remove the create-draft operation from payments-api."*
 
@@ -114,15 +109,14 @@ hexlane op list --filter <text>             # search name, description, and tags
 hexlane op show <app/op>                    # full metadata: params, execution, examples
 hexlane op validate <app/op>               # schema + cross-reference validation
 
-# Dry-run: renders path/body templates without any network or DB call
-hexlane op run payments-api/get-order \
-  --env dev --profile support-user \
-  --param orderId=123 --dry-run
+# Dry-run: renders path/query/body templates without any network or DB call
+hexlane op run github/list-issues \
+  --param owner=torvalds --param repo=linux \
+  --param state=open --dry-run
 
 # Live run (TOON output by default; pass --json to override)
-hexlane op run payments-api/get-order \
-  --env dev --profile support-user \
-  --param orderId=123
+hexlane op run github/get-user \
+  --param username=torvalds
 ```
 
 Options: `--env`, `--profile`, `--param` (repeatable), `--dry-run`, `--limit N` (DB ops), `--json`, `--debug`
@@ -132,23 +126,23 @@ Options: `--env`, `--profile`, `--param` (repeatable), `--dry-run`, `--limit N` 
 Operations are stored in the registered app YAML. Use `op add` to append one without editing the file manually — or simply ask the AI model to do it for you in natural language.
 
 ```bash
-# API operation with path and body templating
+# API operation with path and query templating
 hexlane op add \
-  --app payments-api \
-  --name create-order \
+  --app github \
+  --name list-releases \
   --kind api \
-  --method POST \
-  --path "/orders" \
-  --body '{"type": "{{ orderType }}", "customerId": "{{ customerId }}"}' \
-  --param "orderType:string:required:Order type" \
-  --param "customerId:string:required:Customer ID" \
-  --profile support-user \
-  --default-env production \
-  --description "Create a new order"
+  --method GET \
+  --path "/repos/{{ owner }}/{{ repo }}/releases" \
+  --param "owner:string:required:Repository owner" \
+  --param "repo:string:required:Repository name" \
+  --param "perPage:integer:optional:Results per page" \
+  --profile public \
+  --default-env public \
+  --description "List releases for a public repository"
 
 # DB operation
 hexlane op add \
-  --app payments-api \
+  --app my-app \
   --name find-order \
   --kind db \
   --sql "SELECT id, created_at FROM orders WHERE id = :orderId" \
@@ -164,7 +158,7 @@ hexlane op add \
 
 ```bash
 # Remove an operation
-hexlane op delete payments-api/create-order
+hexlane op delete github/list-releases
 ```
 
 ---
@@ -260,12 +254,12 @@ hexlane credential set --app my-app --env production --profile static-db \
 
 ## App management
 
-App configs are YAML files that define environments, profiles, and credential acquisition strategies. See [`examples/my-app.yaml`](examples/my-app.yaml) for a fully annotated starting point.
+App configs are YAML files that define environments, profiles, and credential acquisition strategies. See [`examples/github.yaml`](examples/github.yaml) for a fully working example.
 
 ```bash
 hexlane app list                               # list all registered apps
 hexlane app show <app-id>                      # full config: envs, profiles, strategies
-hexlane app add --file ./my-app.yaml           # register or update an app from a YAML file — see examples/my-app.yaml
+hexlane app add --file ./my-app.yaml           # register or update an app from a YAML file
 hexlane app validate --file ./my-app.yaml      # validate without registering
 hexlane app remove <app-id>                    # remove an app
 ```

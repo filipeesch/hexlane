@@ -77,7 +77,7 @@ export function registerDbCommands(program: Command): void {
                 const credential = await ctx.resolver.resolve(opts.app, opts.env, profile);
                 const result = await executeDbQuery(
                     ctx.vault,
-                    credential,
+                    credential!,
                     ctx.audit,
                     sql,
                     opts.limit ?? 500,
