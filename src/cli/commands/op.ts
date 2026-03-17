@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { getContext } from "../context.js";
-import { output, outputTable, die, setJsonMode, setToonMode } from "../output.js";
+import { output, outputTable, outputApiResponse, die, setJsonMode, setMachineMode } from "../output.js";
 import { setDebugMode } from "../debug.js";
 import { OperationRegistry } from "../../operations/registry.js";
 import { resolveParams, ParamValidationError } from "../../operations/param-resolver.js";
@@ -23,10 +23,10 @@ export function registerOpCommands(program: Command): void {
         .option("--app <app>", "Filter by app ID")
         .option("--filter <text>", "Case-insensitive text filter (matches name, description, tags)")
         .option("--json", "Output as JSON")
-        .option("--toon", "Output as TOON")
-        .action((opts: { app?: string; filter?: string; json?: boolean; toon?: boolean }) => {
+        .option("--machine", "Output as TOON (structured format for AI/scripting consumption)")
+        .action((opts: { app?: string; filter?: string; json?: boolean; machine?: boolean }) => {
             if (opts.json) setJsonMode(true);
-            if (opts.toon) setToonMode(true);
+            if (opts.machine) setMachineMode(true);
 
             const ctx = getContext();
             const registry = new OperationRegistry(ctx.apps);
@@ -58,17 +58,17 @@ export function registerOpCommands(program: Command): void {
         .command("show <ref>")
         .description("Show full metadata for an operation (e.g. payments-api/get-order)")
         .option("--json", "Output as JSON")
-        .option("--toon", "Output as TOON")
-        .action((ref: string, opts: { json?: boolean; toon?: boolean }) => {
+        .option("--machine", "Output as TOON (structured format for AI/scripting consumption)")
+        .action((ref: string, opts: { json?: boolean; machine?: boolean }) => {
             if (opts.json) setJsonMode(true);
-            if (opts.toon) setToonMode(true);
+            if (opts.machine) setMachineMode(true);
 
             const ctx = getContext();
             const registry = new OperationRegistry(ctx.apps);
             const entry = registry.lookup(ref);
             const op = entry.operation;
 
-            if (opts.json || opts.toon) {
+            if (opts.json || opts.machine) {
                 output({ app: entry.appId, ...op });
                 return;
             }
@@ -164,8 +164,9 @@ export function registerOpCommands(program: Command): void {
         .option("--param <key=value>", "Parameter value, repeatable", (val: string, prev: string[]) => [...prev, val], [] as string[])
         .option("--dry-run", "Render the execution template and print it — no network or DB calls, no credentials accessed")
         .option("--limit <n>", "Max rows returned for DB operations (default: 500)", parseInt)
+        .option("--http-headers", "Include response headers in output (API operations only)")
         .option("--json", "Output as JSON")
-        .option("--toon", "Output as TOON")
+        .option("--machine", "Output as TOON (structured format for AI/scripting consumption)")
         .option("--debug", "Enable verbose debug logging to stderr")
         .action(async (ref: string, opts: {
             env?: string;
@@ -173,12 +174,13 @@ export function registerOpCommands(program: Command): void {
             param: string[];
             dryRun?: boolean;
             limit?: number;
+            httpHeaders?: boolean;
             json?: boolean;
-            toon?: boolean;
+            machine?: boolean;
             debug?: boolean;
         }) => {
             if (opts.json) setJsonMode(true);
-            if (opts.toon) setToonMode(true);
+            if (opts.machine) setMachineMode(true);
             if (opts.debug) setDebugMode(true);
 
             try {
@@ -277,7 +279,7 @@ export function registerOpCommands(program: Command): void {
                         auth: profile.kind === "api_token" ? profile.auth : undefined,
                     });
 
-                    output({ status: result.status, headers: result.headers, body: result.body });
+                    outputApiResponse(result, opts.httpHeaders ?? false);
                 } else {
                     if (profile.kind !== "db_connection") {
                         die(`Profile "${profileName}" is kind "${profile.kind}", not "db_connection". Use a db_connection profile for DB operations.`);
@@ -295,7 +297,7 @@ export function registerOpCommands(program: Command): void {
                         rendered.params,
                     );
 
-                    output(result.rows);
+                    outputTable(result.rows, result.fields);
                 }
             } catch (err) {
                 if (err instanceof Error) {

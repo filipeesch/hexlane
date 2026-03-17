@@ -38,12 +38,18 @@ hexlane op run github/list-issues \
   --param owner=torvalds --param repo=linux \
   --param state=open --dry-run
 
-# Live run — TOON output by default
+# Live run — default output: pretty-printed JSON { status, body } for API ops, table for DB ops
 hexlane op run github/get-user --param username=torvalds
 
-# JSON output
+# Include response headers
+hexlane op run github/get-user --param username=torvalds --http-headers
+
+# Raw JSON output (e.g. to pipe to jq)
 hexlane op run github/get-repo \
   --param owner=torvalds --param repo=linux --json
+
+# TOON output for AI/structured consumption
+hexlane op run github/get-user --param username=torvalds --machine
 
 # DB operation with row limit
 hexlane op run my-app/find-orders \
@@ -56,15 +62,17 @@ hexlane op run my-app/get-account --param id=123 --debug
 
 **Options:**
 
-| Flag                | Description                                           |
-| ------------------- | ----------------------------------------------------- |
-| `--env <name>`      | Override environment (required if no `defaultEnv`)    |
-| `--profile <name>`  | Override profile (required if no default `profile`)   |
-| `--param key=value` | Parameter value — repeatable                          |
-| `--dry-run`         | Render templates and print plan, no execution         |
-| `--limit <n>`       | Max rows for DB operations (default: 500)             |
-| `--json`            | Output as JSON instead of TOON                        |
-| `--debug`           | Log credential state, SQL, and HTTP details to stderr |
+| Flag                | Description                                                  |
+| ------------------- | ------------------------------------------------------------ |
+| `--env <name>`      | Override environment (required if no `defaultEnv`)           |
+| `--profile <name>`  | Override profile (required if no default `profile`)          |
+| `--param key=value` | Parameter value — repeatable                                 |
+| `--dry-run`         | Render templates and print plan, no execution                |
+| `--limit <n>`       | Max rows for DB operations (default: 500)                    |
+| `--http-headers`    | Include response headers in output (API ops only)            |
+| `--machine`         | Output TOON (structured format for AI/scripting consumption) |
+| `--json`            | Output raw JSON                                              |
+| `--debug`           | Log credential state, SQL, and HTTP details to stderr        |
 
 ---
 

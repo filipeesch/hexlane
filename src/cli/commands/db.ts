@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import { getContext } from "../context.js";
-import { output, die, setJsonMode, setToonMode } from "../output.js";
+import { output, outputTable, die, setJsonMode, setMachineMode } from "../output.js";
 import { setDebugMode } from "../debug.js";
 import { executeDbQuery } from "../../executors/db-executor.js";
 
@@ -22,7 +22,7 @@ export function registerDbCommands(program: Command): void {
         .option("--limit <n>", "Max rows returned (default: 500)", parseInt)
         .option("--dry-run", "Preview the final SQL and bound params without executing")
         .option("--json", "Output results as JSON array")
-        .option("--toon", "Output results as TOON (token-efficient format)")
+        .option("--machine", "Output results as TOON (structured format for AI/scripting consumption)")
         .option("--debug", "Enable verbose debug logging to stderr")
         .action(async (opts: {
             app: string;
@@ -34,11 +34,11 @@ export function registerDbCommands(program: Command): void {
             limit?: number;
             dryRun?: boolean;
             json?: boolean;
-            toon?: boolean;
+            machine?: boolean;
             debug?: boolean;
         }) => {
             if (opts.json) setJsonMode(true);
-            if (opts.toon) setToonMode(true);
+            if (opts.machine) setMachineMode(true);
             if (opts.debug) setDebugMode(true);
             try {
                 let sql: string;
@@ -84,7 +84,7 @@ export function registerDbCommands(program: Command): void {
                     params,
                 );
 
-                output(result.rows);
+                outputTable(result.rows, result.fields);
             } catch (e: unknown) {
                 die((e as Error).message);
             }

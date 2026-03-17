@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import { getContext } from "../context.js";
-import { output, die, setJsonMode, setToonMode } from "../output.js";
+import { outputApiResponse, die, setJsonMode, setMachineMode } from "../output.js";
 import { setDebugMode } from "../debug.js";
 import { executeApiCall } from "../../executors/api-executor.js";
 
@@ -20,8 +20,9 @@ export function registerApiCommands(program: Command): void {
         .requiredOption("--path <path>", "API path (e.g. /orders/123)")
         .option("--body <json>", "Request body as JSON string")
         .option("--body-file <path>", "Request body from file")
+        .option("--http-headers", "Include response headers in output")
         .option("--json", "Output response as JSON")
-        .option("--toon", "Output response as TOON (token-efficient format)")
+        .option("--machine", "Output response as TOON (structured format for AI/scripting consumption)")
         .option("--debug", "Enable verbose debug logging to stderr")
         .action(async (opts: {
             app: string;
@@ -31,12 +32,13 @@ export function registerApiCommands(program: Command): void {
             path: string;
             body?: string;
             bodyFile?: string;
+            httpHeaders?: boolean;
             json?: boolean;
-            toon?: boolean;
+            machine?: boolean;
             debug?: boolean;
         }) => {
             if (opts.json) setJsonMode(true);
-            if (opts.toon) setToonMode(true);
+            if (opts.machine) setMachineMode(true);
             if (opts.debug) setDebugMode(true);
             try {
                 // Resolve body
@@ -70,7 +72,7 @@ export function registerApiCommands(program: Command): void {
                     auth: profile.kind === "api_token" ? profile.auth : undefined,
                 });
 
-                output({ status: result.status, headers: result.headers, body: result.body });
+                outputApiResponse(result, opts.httpHeaders ?? false);
             } catch (e: unknown) {
                 die((e as Error).message);
             }

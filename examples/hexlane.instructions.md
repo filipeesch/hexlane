@@ -39,6 +39,12 @@ hexlane op run <app-id>/<op-name> \
   --param key=value
 ```
 
+Default output format:
+- **API operations**: pretty-printed JSON `{ "status": 200, "body": { ... } }` — headers hidden unless `--http-headers` is passed
+- **DB operations**: table of rows
+
+Use `--machine` to get TOON output (structured, consistent format well-suited for model consumption). Use `--json` for raw JSON.
+
 Always use `--dry-run` first to confirm the rendered request before executing:
 
 ```bash
@@ -82,6 +88,14 @@ If the user provides an OpenAPI spec, use the paths, methods, and parameter defi
 ```bash
 hexlane api call --app <app-id> --env <env> --profile <profile> \
   --method GET --path /some/path
+
+# Include response headers
+hexlane api call --app <app-id> --env <env> --profile <profile> \
+  --method GET --path /some/path --http-headers
+
+# TOON output for structured/AI consumption
+hexlane api call --app <app-id> --env <env> --profile <profile> \
+  --method GET --path /some/path --machine
 ```
 
 ### Raw DB queries (ad-hoc investigation)
@@ -117,3 +131,5 @@ Add `--debug` to any command to trace the full credential acquisition and reques
 - Never interpolate variable values into `--path` or `--sql` strings — always use `--param`
 - Always check `op list` before reaching for `api call` or `db query`
 - Always `op add` a new operation before running it if one doesn't exist — don't run ad-hoc calls for tasks that will recur
+- Use `--machine` when you need structured TOON output; the default format is human-readable (pretty JSON for API, table for DB)
+- Pass `--http-headers` only when response headers are needed for the task

@@ -16,18 +16,31 @@ hexlane api call <app-id> <path> [options]
 
 ### Options
 
-| Flag                      | Description                                        |
-| ------------------------- | -------------------------------------------------- |
-| `-e, --env <env>`         | Environment (default: first defined)               |
-| `-p, --profile <profile>` | Profile override (default: first defined)          |
-| `-m, --method <method>`   | HTTP method (default: `GET`)                       |
-| `-H, --header <header>`   | Add request header — repeatable: `-H "X-Foo: bar"` |
-| `-b, --body <body>`       | Request body string                                |
-| `--json`                  | Output raw JSON instead of TOON                    |
+| Flag                      | Description                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| `-e, --env <env>`         | Environment (default: first defined)                         |
+| `-p, --profile <profile>` | Profile override (default: first defined)                    |
+| `-m, --method <method>`   | HTTP method (default: `GET`)                                 |
+| `-H, --header <header>`   | Add request header — repeatable: `-H "X-Foo: bar"`           |
+| `-b, --body <body>`       | Request body string                                          |
+| `--http-headers`          | Include response headers in the output                       |
+| `--machine`               | Output TOON (structured format for AI/scripting consumption) |
+| `--json`                  | Output raw JSON envelope `{ status, headers?, body }`        |
 
-### Response envelope
+### Response format
 
-Every `api call` response is wrapped in a structured envelope regardless of output format:
+By default, `api call` outputs pretty-printed JSON with `status` and `body` only:
+
+```json
+{
+  "status": 200,
+  "body": { ... }
+}
+```
+
+`body` is parsed JSON if the response `Content-Type` is JSON, otherwise a raw string. Non-2xx responses use the same shape — `status` reflects the HTTP code.
+
+Pass `--http-headers` to include response headers:
 
 ```json
 {
@@ -36,11 +49,11 @@ Every `api call` response is wrapped in a structured envelope regardless of outp
     "content-type": "application/json",
     "x-ratelimit-remaining": "59"
   },
-  "body": { ... }   // parsed JSON if response Content-Type is JSON, raw string otherwise
+  "body": { ... }
 }
 ```
 
-The envelope is always written to stdout. Errors (non-2xx or network failures) also use this shape, with `status` set to the HTTP code.
+Pass `--machine` to get TOON output (structured, intended for AI model consumption or scripting). Pass `--json` for a raw JSON envelope.
 
 ### Examples
 
@@ -57,8 +70,14 @@ hexlane api call my-app /orders \
 # Use a specific env and profile
 hexlane api call my-app /reports -e staging -p read-only
 
+# Include response headers
+hexlane api call github /users/torvalds --http-headers
+
 # Raw JSON output (e.g. to pipe to jq)
 hexlane api call github /repos/torvalds/linux --json | jq '.body.stargazers_count'
+
+# TOON output for AI/structured consumption
+hexlane api call github /users/torvalds --machine
 ```
 
 ### Public vs authenticated profiles
@@ -80,16 +99,17 @@ SQL is provided via `--sql` or `--sql-file`. Named parameters are bound with `:n
 
 ### Options
 
-| Flag                      | Description                                             |
-| ------------------------- | ------------------------------------------------------- |
-| `-e, --env <env>`         | Environment (default: first defined)                    |
-| `-p, --profile <profile>` | Profile override (default: first defined)               |
-| `-s, --sql <sql>`         | SQL statement                                           |
-| `-f, --sql-file <path>`   | Path to a `.sql` file                                   |
-| `--param <name=value>`    | Bind a named parameter — repeatable                     |
-| `--limit <n>`             | Append `LIMIT n` to the query                           |
-| `--dry-run`               | Print the resolved SQL and parameters without executing |
-| `--json`                  | Output raw JSON instead of TOON                         |
+| Flag                      | Description                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| `-e, --env <env>`         | Environment (default: first defined)                         |
+| `-p, --profile <profile>` | Profile override (default: first defined)                    |
+| `-s, --sql <sql>`         | SQL statement                                                |
+| `-f, --sql-file <path>`   | Path to a `.sql` file                                        |
+| `--param <name=value>`    | Bind a named parameter — repeatable                          |
+| `--limit <n>`             | Append `LIMIT n` to the query                                |
+| `--dry-run`               | Print the resolved SQL and parameters without executing      |
+| `--machine`               | Output TOON (structured format for AI/scripting consumption) |
+| `--json`                  | Output raw JSON array of rows                                |
 
 ### Named parameters
 
@@ -166,6 +186,9 @@ hexlane db query my-app --sql-file ./queries/audit.sql --dry-run
 
 # JSON output for scripting
 hexlane db query my-app --sql "SELECT id, name FROM products" --json | jq '[.[].name]'
+
+# TOON output for AI/structured consumption
+hexlane db query my-app --sql "SELECT id, name FROM products" --machine
 ```
 
 ---
