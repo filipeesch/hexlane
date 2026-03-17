@@ -85,219 +85,29 @@ No vault passphrase, no `credential set`, no token needed — the `public` profi
 
 ---
 
-## Operations (preferred)
+## Features
 
-Operations are named, typed, discoverable actions defined in app configs. They wrap API calls or DB queries with declared parameters, path/body templating, and optional defaults for env and profile. Prefer `op run` over raw `api call` / `db query` whenever an operation is defined for the task.
+- **Named operations** — typed, parameterized actions discovered and run by humans and AI agents alike
+- **Template engine** — path, query, headers, and body rendered from declared parameters; `{{ name }}` syntax
+- **Multi-engine DB support** — PostgreSQL, MySQL, SQL Server, Oracle; injection-safe `:name` parameter binding
+- **Pluggable credential acquisition** — `http`, `shell`, `static` strategies; `bearer`, `header`, `query_param` auth injection
+- **Automatic renewal** — credentials cached in the vault, renewed before expiry using `renewal_policy`
+- **Public profiles** — `kind: public` bypasses vault entirely for open APIs; no setup required
+- **AES-256-GCM vault** — all secrets encrypted at rest; passphrase managed by OS keychain
+- **Structured audit log** — every credential acquisition and API/DB call recorded (credential IDs only, no secret values)
+- **AI-friendly** — `op discover`, `op list`, `op show` designed for model consumption; operations compound over time
 
-Operations can be created and managed entirely through natural language. Tell the AI model what you want to do, and it will define the appropriate operation using `op add` — choosing the right method, path, parameters, and profile. You never need to write the command yourself.
-
-> *"Use hexlane to create an operation that fetches a user profile from the GitHub API."*
-> *"Use hexlane to add a DB operation that queries the orders table for all rows with a given status."*
-> *"Use hexlane to remove the create-draft operation from payments-api."*
-
-**Using an OpenAPI spec as context:** If your API has an OpenAPI (Swagger) file, share it with the model. It contains all the paths, methods, parameters, and schemas the model needs to define accurate operations without guessing. You can paste it directly into the conversation or reference it as a file attachment.
-
-**Tip — custom instructions for your editor:** For the best experience, configure your AI assistant (Cursor, GitHub Copilot, or similar) with custom rules that instruct it to always use hexlane when interacting with registered applications. This ensures the model reaches for `op list`, `op run`, and `op add` automatically rather than suggesting raw curl or ad-hoc scripts. See [`examples/hexlane.instructions.md`](examples/hexlane.instructions.md) for a ready-to-use starting point.
-
-### Discovering and running
-
-```bash
-hexlane op list                              # all operations across all apps
-hexlane op list --app <app-id>              # filter by app
-hexlane op list --filter <text>             # search name, description, and tags
-
-hexlane op show <app/op>                    # full metadata: params, execution, examples
-hexlane op validate <app/op>               # schema + cross-reference validation
-
-# Dry-run: renders path/query/body templates without any network or DB call
-hexlane op run github/list-issues \
-  --param owner=torvalds --param repo=linux \
-  --param state=open --dry-run
-
-# Live run (TOON output by default; pass --json to override)
-hexlane op run github/get-user \
-  --param username=torvalds
-```
-
-Options: `--env`, `--profile`, `--param` (repeatable), `--dry-run`, `--limit N` (DB ops), `--json`, `--debug`
-
-### Defining operations with `op add`
-
-Operations are stored in the registered app YAML. Use `op add` to append one without editing the file manually — or simply ask the AI model to do it for you in natural language.
-
-```bash
-# API operation with path and query templating
-hexlane op add \
-  --app github \
-  --name list-releases \
-  --kind api \
-  --method GET \
-  --path "/repos/{{ owner }}/{{ repo }}/releases" \
-  --param "owner:string:required:Repository owner" \
-  --param "repo:string:required:Repository name" \
-  --param "perPage:integer:optional:Results per page" \
-  --profile public \
-  --default-env public \
-  --description "List releases for a public repository"
-
-# DB operation
-hexlane op add \
-  --app my-app \
-  --name find-order \
-  --kind db \
-  --sql "SELECT id, created_at FROM orders WHERE id = :orderId" \
-  --param "orderId:integer:required:Order primary key" \
-  --profile readonly \
-  --default-env production
-```
-
-`--param` format: `name:type:required:description`
-- `type`: `string` (default), `integer`, `number`, `boolean`
-- third segment: `required` (default) or `optional` — only the literal word `optional` marks it as not required
-- description can contain colons
-
-```bash
-# Remove an operation
-hexlane op delete github/list-releases
-```
+**Tip — custom instructions for your editor:** See [`examples/hexlane.instructions.md`](examples/hexlane.instructions.md) for a ready-to-use snippet that instructs your AI assistant to reach for hexlane automatically instead of suggesting raw curl or ad-hoc scripts.
 
 ---
 
-## Database queries
+## Documentation
 
-```bash
-hexlane db query --app <app> --env <env> --profile <profile> \
-  --sql "SELECT COUNT(*) FROM orders"
-
-# Named parameters — injection-safe, bound via parameterized queries
-hexlane db query --app <app> --env <env> --profile <profile> \
-  --sql "SELECT id, created_at FROM orders WHERE status = :status" \
-  --param status=active
-
-# Multiple params
-hexlane db query ... \
-  --sql "SELECT * FROM t WHERE a = :x AND b = :y" \
-  --param x=foo --param y=bar
-
-# Preview the final SQL and bound params without connecting to the database
-hexlane db query ... --sql "SELECT * FROM t WHERE id = :id" --param id=1 --dry-run
-
-# From file
-hexlane db query ... --sql-file ./query.sql
-```
-
-Options: `--dry-run`, `--json`, `--limit <n>` (default 500), `--sql-file <path>`, `--debug`
+| Topic | Description |
+|---|---|
+| [Operations](docs/operations.md) | Define, discover, and run named operations; template syntax; AI tips |
+| [Credentials](docs/credentials.md) | Credential lifecycle, static tokens, static DB connections, vault architecture |
+| [App Config](docs/app-config.md) | Full YAML schema reference — all profile kinds, strategies, auth injection |
+| [API & DB](docs/api-db.md) | Raw `api call` and `db query` reference |
 
 ---
-
-## API calls
-
-API responses always return a structured envelope `{ status, headers, body }` — status code and headers are never split to stderr.
-
-```bash
-hexlane api call --app <app> --env <env> --profile <profile> \
-  --method GET --path /api/v1/resource
-
-# POST with body
-hexlane api call ... --method POST --path /api/v1/resource \
-  --body '{"key": "value"}'
-
-# Body from file
-hexlane api call ... --method POST --path /api/v1/resource \
-  --body-file ./payload.json
-```
-
-Options: `--json` (same `{ status, headers, body }` envelope in JSON), `--body-file <path>`, `--debug`
-
----
-
-## Credential management
-
-Credentials are acquired and cached automatically on first use. Expiry is tracked and renewal happens before the credential expires.
-
-```bash
-hexlane credential list                                                   # all cached credentials with expiry
-hexlane credential revoke --app <app> --env <env> --profile <profile>     # force re-acquire on next use (e.g. after 401)
-```
-
-### Static credentials
-
-For credentials that are externally managed and can't be fetched automatically, declare the profile with `acquire_strategy: static` and load the value once with `credential set`. hexlane stores it in the encrypted vault.
-
-**API token (JWT or opaque):**
-```bash
-# Load a token (or rotate it)
-hexlane credential set \
-  --app my-app --env production --profile my-service \
-  --token eyJhbGciOiJSUzI1NiJ9...
-
-# Pipe from a file or a secret manager
-cat ./token.jwt | hexlane credential set --app my-app --env production --profile my-service
-
-# If the JWT contains an exp claim, expiry is tracked automatically.
-# When it expires, run credential set again with the new token.
-```
-
-**Database connection string:**
-```bash
-# Supported schemes: postgresql, mysql, sqlserver, oracle
-hexlane credential set \
-  --app my-app --env production --profile static-db \
-  --connection-string "postgresql://user:pass@host:5432/dbname?sslmode=require"
-
-# Pull from an environment variable or secret manager to avoid shell history
-hexlane credential set --app my-app --env production --profile static-db \
-  --connection-string "$DATABASE_URL"
-```
-
----
-
-## App management
-
-App configs are YAML files that define environments, profiles, and credential acquisition strategies. See [`examples/github.yaml`](examples/github.yaml) for a fully working example.
-
-```bash
-hexlane app list                               # list all registered apps
-hexlane app show <app-id>                      # full config: envs, profiles, strategies
-hexlane app add --file ./my-app.yaml           # register or update an app from a YAML file
-hexlane app validate --file ./my-app.yaml      # validate without registering
-hexlane app remove <app-id>                    # remove an app
-```
-
----
-
-## Output Format
-
-**TOON is the default output format for all commands.** Use `--json` only when you need JSON explicitly.
-
-| Situation                             | Use                                             |
-| ------------------------------------- | ----------------------------------------------- |
-| Normal usage (rows, API responses)    | (no flag — TOON is the default)                 |
-| Need JSON format                      | `--json`                                        |
-| Checking HTTP status / response shape | (no flag needed — envelope is always in stdout) |
-| Credential / connection issues        | `--debug`                                       |
-| Preview SQL or op before executing    | `--dry-run`                                     |
-
----
-
-## Workflow
-
-1. **Discover apps** — `hexlane app list` + `hexlane app show <app-id>` to find envs and profiles.
-2. **Check for operations** — `hexlane op list --app <app-id>`. If one exists for your task, use it.
-3. **Before running** — `hexlane op show <app/op>` to read param names/types, then `--dry-run` to confirm the rendered request.
-4. **Parameterize everything** — never interpolate values into `--sql` or path strings; always use `--param name=value`.
-5. **On auth failure** — `hexlane credential revoke ...` then retry. Add `--debug` to trace the full cycle.
-
----
-
-## Build
-
-```bash
-npm run build       # bundles to dist/ via ncc
-npm run typecheck   # type-check without emitting
-npm test            # run all tests (vitest)
-```
-
-## License
-
-ISC
