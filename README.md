@@ -50,7 +50,7 @@ Credentials are **never visible to the AI model** or stored in plain text. The v
 ## Installation
 
 ```bash
-git clone https://github.com/you/hexlane
+git clone https://github.com/filipeesch/hexlane
 cd hexlane
 npm install
 npm link        # installs the `hexlane` binary globally via npm link
