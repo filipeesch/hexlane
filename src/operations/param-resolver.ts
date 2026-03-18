@@ -1,11 +1,17 @@
-import type { Operation, OperationParameter } from "./schema.js";
+import type { OperationParameter } from "./schema.js";
 
 export type ResolvedParams = Record<string, string | number | boolean>;
+
+/** Minimal interface used by resolveParams — works for both old (Operation) and new (ToolOperation) models. */
+export interface OperationLike {
+    name: string;
+    parameters: OperationParameter[];
+}
 
 export class ParamValidationError extends Error {
     constructor(
         public readonly errors: string[],
-        public readonly operation: Operation,
+        public readonly operation: OperationLike,
     ) {
         super(`Parameter validation failed for operation "${operation.name}":\n` + errors.map((e) => `  • ${e}`).join("\n"));
         this.name = "ParamValidationError";
@@ -20,7 +26,7 @@ export class ParamValidationError extends Error {
  * --param invocation so both humans and coding agents can self-correct.
  */
 export function resolveParams(
-    operation: Operation,
+    operation: OperationLike,
     rawParams: Record<string, string>,
 ): ResolvedParams {
     const errors: string[] = [];

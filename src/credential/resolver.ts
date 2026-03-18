@@ -1,5 +1,6 @@
 import * as crypto from "crypto";
 import type { Profile, AuthenticatedProfile } from "../config/schema.js";
+import type { IntegrationTargetCredential } from "../config/integration-schema.js";
 import { VaultManager } from "../vault/vault-manager.js";
 import { MetadataStore, type CredentialRecord } from "../metadata/store.js";
 import { LockManager } from "./lock-manager.js";
@@ -205,5 +206,34 @@ export class CredentialResolver {
             this.metadata.delete(record.id);
         }
         return { removed: stale.length };
+    }
+
+    /**
+     * Resolves a credential for the integration/target model.
+     * Maps integrationId → app, targetId → env, credential.kind → profile name.
+     * Returns null for public credentials.
+     */
+    async resolveForTarget(
+        integrationId: string,
+        targetId: string,
+        credential: IntegrationTargetCredential,
+    ): Promise<CredentialRecord | null> {
+        if (credential.kind === "public") return null;
+
+        // Construct a synthetic AuthenticatedProfile from the target credential.
+        // The profile name is the credential kind ("api_token" or "db_connection").
+        const syntheticProfile: AuthenticatedProfile = {
+            name: credential.kind,
+            kind: credential.kind,
+            acquire_strategy: credential.acquire_strategy,
+            ...(credential.kind === "api_token" && credential.auth !== undefined
+                ? { auth: credential.auth }
+                : {}),
+            ...(credential.renewal_policy !== undefined
+                ? { renewal_policy: credential.renewal_policy }
+                : {}),
+        };
+
+        return this.resolve(integrationId, targetId, syntheticProfile);
     }
 }

@@ -63,11 +63,11 @@ npm link        # installs the `hexlane` binary globally via npm link
 The fastest way to try hexlane is with the GitHub example — it uses public endpoints, so no credentials or setup are needed.
 
 ```bash
-# 1. Register the GitHub app (operations are baked in)
-hexlane app add --file examples/github.yaml
+# 1. Register the GitHub integration
+hexlane integration add --file examples/github.yaml
 
 # 2. See what operations are available
-hexlane op list --app github
+hexlane op list --integration github
 
 # 3. Preview a request before running it
 hexlane op run github/get-user --param username=torvalds --dry-run
@@ -81,34 +81,37 @@ hexlane op run github/list-issues \
   --param state=open --param perPage=10
 ```
 
-No vault passphrase, no `credential set`, no token needed — the `public` profile bypasses auth entirely.
+No vault passphrase, no `credential set`, no token needed — the `public` credential kind bypasses auth entirely.
 
 ---
 
 ## Features
 
 - **Named operations** — typed, parameterized actions discovered and run by humans and AI agents alike
+- **Integration-based architecture** — one YAML file groups targets (named tool instances) and operations for an external system
 - **Template engine** — path, query, headers, and body rendered from declared parameters; `{{ name }}` syntax
-- **Multi-engine DB support** — PostgreSQL, MySQL, SQL Server, Oracle; injection-safe `:name` parameter binding
+- **Multi-engine SQL support** — PostgreSQL, MySQL, SQL Server, Oracle; injection-safe `:name` parameter binding
 - **Pluggable credential acquisition** — `http`, `shell`, `static` strategies; `bearer`, `header`, `query_param` auth injection
 - **Automatic renewal** — credentials cached in the vault, renewed before expiry using `renewal_policy`
-- **Public profiles** — `kind: public` bypasses vault entirely for open APIs; no setup required
+- **Public targets** — `credential.kind: public` bypasses vault entirely for open APIs; no setup required
 - **AES-256-GCM vault** — all secrets encrypted at rest; passphrase managed by OS keychain
-- **Structured audit log** — every credential acquisition and API/DB call recorded (credential IDs only, no secret values)
+- **Structured audit log** — every credential acquisition and HTTP/SQL call recorded (credential IDs only, no secret values)
 - **AI-friendly** — `op discover`, `op list`, `op show` designed for model consumption; operations compound over time
 - **Credential isolation** — credentials are never exposed to the AI model; the model only sees operation output
 
 **Tip — custom instructions for your editor:** See [`examples/hexlane.instructions.md`](examples/hexlane.instructions.md) for a ready-to-use snippet that instructs your AI assistant to reach for hexlane automatically instead of suggesting raw curl or ad-hoc scripts.
 
+See [`examples/github.yaml`](examples/github.yaml) for a fully working integration file using public GitHub endpoints.
+
 ---
 
 ## Documentation
 
-| Topic                              | Description                                                                    |
-| ---------------------------------- | ------------------------------------------------------------------------------ |
-| [Operations](docs/operations.md)   | Define, discover, and run named operations; template syntax; AI tips           |
-| [Credentials](docs/credentials.md) | Credential lifecycle, static tokens, static DB connections, vault architecture |
-| [App Config](docs/app-config.md)   | Full YAML schema reference — all profile kinds, strategies, auth injection     |
-| [API & DB](docs/api-db.md)         | Raw `api call` and `db query` reference                                        |
+| Topic                                            | Description                                                                        |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| [Operations](docs/operations.md)                 | Define, discover, and run named operations; template syntax; AI tips               |
+| [Credentials](docs/credentials.md)               | Credential lifecycle, static tokens, static DB connections, vault architecture     |
+| [Integration Config](docs/integration-config.md) | Integration YAML reference — targets, credential kinds, strategies, auth injection |
+| [HTTP & SQL](docs/http-sql.md)                   | Ad-hoc `http call` and `sql query` reference                                       |
 
 ---

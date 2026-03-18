@@ -7,6 +7,7 @@ import { LockManager } from "../credential/lock-manager.js";
 import { CredentialResolver } from "../credential/resolver.js";
 import { AuditLogger } from "../audit/logger.js";
 import { AppStore } from "../config/app-store.js";
+import { IntegrationStore } from "../config/integration-store.js";
 
 export interface HexlaneContext {
     hexlaneDir: string;
@@ -16,6 +17,7 @@ export interface HexlaneContext {
     audit: AuditLogger;
     resolver: CredentialResolver;
     apps: AppStore;
+    integrations: IntegrationStore;
 }
 
 export function getHexlaneDir(): string {
@@ -41,8 +43,9 @@ export function getContext(): HexlaneContext {
     const locks = new LockManager(hexlaneDir);
     const audit = new AuditLogger(hexlaneDir);
     const apps = new AppStore(hexlaneDir);
+    const integrations = new IntegrationStore(hexlaneDir);
     const resolver = new CredentialResolver(vault, metadata, locks, audit);
 
-    _ctx = { hexlaneDir, vault, metadata, locks, audit, resolver, apps };
+    _ctx = { hexlaneDir, vault, metadata, locks, audit, resolver, apps, integrations };
     return _ctx;
 }

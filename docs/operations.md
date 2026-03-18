@@ -1,47 +1,50 @@
 # Operations
 
-Operations are named, typed, discoverable actions stored in app configs. They wrap API calls or DB queries with declared parameters, path/query/body templating, and optional defaults for environment and profile. Every operation created by an AI agent or a human persists and becomes a reusable building block for future sessions.
+Operations are named, typed, discoverable actions defined inside an **integration** — a single YAML file that groups targets and operations for one external system. They wrap HTTP calls or SQL queries with declared parameters, path/query/body templating, and a default target. Every operation created by an AI agent or a human persists and becomes a reusable building block for future sessions.
 
-Prefer `op run` over raw `api call` / `db query` whenever an operation exists for the task.
+A **target** is a named, configured instance of a tool (`http` or `sql`) within an integration. You run operations through a target:
+
+```
+hexlane op run <target-id>/<op-name>
+```
+
+Prefer `op run` over raw `http call` / `sql query` whenever an operation exists for the task.
 
 ---
 
 ## Discovering operations
 
 ```bash
-hexlane op list                        # all operations across all apps
-hexlane op list --app <app-id>         # filter by app
-hexlane op list --filter <text>        # search name, description, and tags
+hexlane op list                                  # all operations across all integrations
+hexlane op list --integration <integration-id>   # filter by integration
 
-hexlane op show <app/op>               # full metadata: params, execution, examples
-hexlane op validate <app/op>           # schema + cross-reference validation
+hexlane op show <target-id>/<op-name>            # full metadata: params, execution, examples
+hexlane op validate <target-id>/<op-name>        # schema + cross-reference validation
 ```
 
-`op show` prints the operation's kind, default env/profile, all declared parameters (name, type, required, description), the execution template, and any examples. Always run it before `op run` on an unfamiliar operation.
+`op show` prints the operation's tool type, default target, all declared parameters (name, type, required, description), the execution template, and any examples. Always run it before `op run` on an unfamiliar operation.
 
 ---
 
 ## Running operations
 
 ```bash
-hexlane op run <app/op> \
-  --env <env> \
-  --profile <profile> \
+hexlane op run <target-id>/<op-name> \
   --param key=value    # repeatable
 ```
 
-`--env` and `--profile` are optional if the operation declares `defaultEnv` and `profile`. Always use `--dry-run` first on operations you haven't run before — it renders all templates without touching any network or database.
+The target is the namespace — it specifies both the system to call and where to find the credentials. `--param` values are substituted into path/query/body/SQL templates.
 
 ```bash
-# Dry-run — renders path, query, body templates and prints the plan, no execution
+# Dry-run — renders all templates and prints the plan, no execution
 hexlane op run github/list-issues \
   --param owner=torvalds --param repo=linux \
   --param state=open --dry-run
 
-# Live run — default output: pretty-printed JSON { status, body } for API ops, table for DB ops
+# Live run — default output: pretty-printed { status, body } for http ops, table for sql ops
 hexlane op run github/get-user --param username=torvalds
 
-# Include response headers
+# Include response headers (http ops only)
 hexlane op run github/get-user --param username=torvalds --http-headers
 
 # Raw JSON output (e.g. to pipe to jq)
@@ -51,25 +54,22 @@ hexlane op run github/get-repo \
 # TOON output for AI/structured consumption
 hexlane op run github/get-user --param username=torvalds --machine
 
-# DB operation with row limit
-hexlane op run my-app/find-orders \
-  --env production --profile readonly \
+# SQL op with row limit
+hexlane op run my-app-db-prod/find-orders \
   --param status=failed --limit 100
 
 # Debug credential acquisition and request details
-hexlane op run my-app/get-account --param id=123 --debug
+hexlane op run my-app-api-prod/get-account --param id=123 --debug
 ```
 
 **Options:**
 
 | Flag                | Description                                                  |
 | ------------------- | ------------------------------------------------------------ |
-| `--env <name>`      | Override environment (required if no `defaultEnv`)           |
-| `--profile <name>`  | Override profile (required if no default `profile`)          |
 | `--param key=value` | Parameter value — repeatable                                 |
 | `--dry-run`         | Render templates and print plan, no execution                |
-| `--limit <n>`       | Max rows for DB operations (default: 500)                    |
-| `--http-headers`    | Include response headers in output (API ops only)            |
+| `--limit <n>`       | Max rows for SQL operations (default: 500)                   |
+| `--http-headers`    | Include response headers in output (http ops only)           |
 | `--machine`         | Output TOON (structured format for AI/scripting consumption) |
 | `--json`            | Output raw JSON                                              |
 | `--debug`           | Log credential state, SQL, and HTTP details to stderr        |
@@ -78,59 +78,56 @@ hexlane op run my-app/get-account --param id=123 --debug
 
 ## Defining operations with `op add`
 
-Operations are stored in the registered app YAML. `op add` appends one without editing the file manually. You can also ask an AI model to do this in natural language:
+Operations are stored in the integration YAML. `op add` appends one without editing the file manually. You can also ask an AI model to do this in natural language:
 
 > *"Create an operation in hexlane that fetches a user profile from the GitHub API."*
-> *"Add a DB operation to my-app that queries the transactions table for all failed rows in the last 7 days."*
+> *"Add an SQL operation to my-app that queries the transactions table for all failed rows in the last 7 days."*
 
 If your API has an OpenAPI (Swagger) spec, share it with the model — it contains all the paths, methods, and parameters needed to define operations with perfect accuracy.
 
-### API operation
+### HTTP operation
 
 ```bash
 hexlane op add \
-  --app <app-id> \
+  --integration <integration-id> \
   --name <name> \
-  --kind api \
+  --tool http \
   --method GET|POST|PUT|PATCH|DELETE \
   --path "/resource/{{ paramName }}" \
   --param "name:type:required_or_optional:description" \
-  --profile <profile> \
-  --default-env <env> \
+  --default-target <target-id> \
   --description "What this operation does"
 ```
 
 Path supports `{{ varName }}` template placeholders. Any parameter that appears in the path must be declared with `--param`.
 
-**With a `query:` block** — query parameters are set in the YAML directly (see [app-config.md](app-config.md#api-operation)). When using `op add`, put optional query params as regular parameters; the query block can be added manually or via the YAML file later.
+**With a `query:` block** — query parameters are set in the YAML directly (see [integration-config.md](integration-config.md#http-operation)). When using `op add`, put optional query params as regular parameters; the query block can be added manually or via the YAML file later.
 
 **With a request body:**
 
 ```bash
 hexlane op add \
-  --app my-app \
+  --integration my-app \
   --name create-order \
-  --kind api \
+  --tool http \
   --method POST \
   --path "/orders" \
   --body '{"type": "{{ orderType }}", "customerId": "{{ customerId }}"}' \
   --param "orderType:string:required:Order type" \
   --param "customerId:string:required:Customer ID" \
-  --profile support-user \
-  --default-env production
+  --default-target my-app-api-prod
 ```
 
-### DB operation
+### SQL operation
 
 ```bash
 hexlane op add \
-  --app my-app \
+  --integration my-app \
   --name find-order \
-  --kind db \
+  --tool sql \
   --sql "SELECT id, created_at FROM orders WHERE status = :status" \
   --param "status:string:required:Order status" \
-  --profile readonly \
-  --default-env production
+  --default-target my-app-db-prod
 ```
 
 SQL uses `:name` placeholders — injection-safe, bound via parameterized queries. PostgreSQL `::type` cast syntax (e.g. `id::text`) does not conflict with `:name` params.
@@ -160,10 +157,10 @@ dryRun:boolean:optional:Preview only
 ## Removing operations
 
 ```bash
-hexlane op delete <app/op>
+hexlane op delete <integration-id>/<op-name>
 ```
 
-This removes the operation from the app's YAML config file. The change takes effect immediately — no re-registration needed.
+This removes the operation from the integration YAML. The change takes effect immediately — no re-registration needed.
 
 ---
 
@@ -195,8 +192,10 @@ query:
 
 ## Tips for AI models
 
-- Always run `hexlane op list --app <id>` before reaching for `api call` or `db query`
-- Check `op show <app/op>` to read param names, types, and defaults before running
+- Always run `hexlane op list --integration <id>` before reaching for `http call` or `sql query`
+- Check `op show <target-id>/<op-name>` to read param names, types, and defaults before running
 - Run with `--dry-run` first to confirm the rendered request
+- Use `--machine` when you need structured TOON output; the default is human-readable (pretty JSON for HTTP, table for SQL)
+
 - Use `op add` to define new operations before running them — they persist for future sessions
 - See [`examples/hexlane.instructions.md`](../examples/hexlane.instructions.md) for a ready-to-paste Cursor/Copilot rules file
