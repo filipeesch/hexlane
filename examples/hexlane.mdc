@@ -23,6 +23,7 @@ The `credential.kind` field on each target determines what's needed:
 - `public` → use `hexlane http call` or `hexlane op run` — no credentials needed
 - `api_token` → use `hexlane http call` or `hexlane op run` (if an operation is defined)
 - `db_connection` → use `hexlane sql query` or `hexlane op run` (if an operation is defined)
+- tool `fs` → use `hexlane fs` commands — no credentials needed
 
 ---
 
@@ -137,6 +138,77 @@ hexlane http call <target-id> /api/v1/resource \
 --http-headers  # Include response headers in output
 --json    # Override default TOON output with JSON (envelope shape is the same: { status, headers?, body })
 --debug   # Log URL, request headers, and response details to stderr
+```
+
+### `hexlane fs` — Read and write files within a registered directory target
+
+Every write operation (`write`, `replace`, `move`, `delete`) **snapshots** the original content and returns an `operationId`. Pass that ID to `hexlane fs rollback restore` to undo the change. Always use `--dry-run` when unsure, and use `--expect` on `fs write --lines` to guard against stale line numbers.
+
+```bash
+# Read a single file (partial or full)
+hexlane fs read <target-id> --file src/main.ts
+hexlane fs read <target-id> --file src/main.ts --lines 10-50
+
+# Read multiple files at once (returns { files, skipped })
+hexlane fs read <target-id> --glob "src/**/*.ts"
+hexlane fs read <target-id> --glob "src/**/*.ts" --depth 2
+
+hexlane fs stat <target-id> --file src/main.ts                 # metadata
+hexlane fs list <target-id> --glob "**/*.ts" --depth 2         # list files
+hexlane fs search <target-id> --pattern "TODO" --glob "**/*.ts" --context 3
+
+# Write (create or overwrite — snapshots before writing if file exists)
+hexlane fs write <target-id> --file src/new-file.ts --content "export const x = 1;"
+hexlane fs write <target-id> --file src/main.ts --content-file /tmp/patched.ts
+hexlane fs write <target-id> --file src/main.ts --dry-run --content "..."    # preview
+
+# Patch a specific line range (--expect is a guard against stale line numbers)
+hexlane fs write <target-id> --file src/main.ts \
+  --lines 45-52 \
+  --content "  return newValue;" \
+  --expect "return oldValue;"    # only patches if line 45 contains this string
+
+# Safe single-site edit — position-independent, errors if text not found or ambiguous
+# Preferred over write --lines for AI agents: no stale line numbers
+hexlane fs replace <target-id> \
+  --file src/main.ts \
+  --literal --once \
+  --pattern 'return oldValue;' \
+  --replacement 'return newValue;'
+
+# Bulk regex replace across files
+hexlane fs replace <target-id> \
+  --pattern "oldName" --replacement "newName" \
+  --glob "**/*.ts" --dry-run
+
+# Multi-line patterns / replacements via files
+hexlane fs replace <target-id> \
+  --file src/main.ts --literal --once \
+  --pattern-file /tmp/old-block.txt \
+  --replacement-file /tmp/new-block.txt
+
+# Move / delete
+hexlane fs move <target-id> --from src/old.ts --to src/new.ts
+hexlane fs delete <target-id> --file src/unused.ts
+
+# Rollback
+hexlane fs rollback list <target-id>                             # see available snapshots
+hexlane fs rollback restore <target-id> --operation-id <id>     # undo a write
+hexlane fs rollback prune --older-than 7d                        # clean up old snapshots
+```
+
+**Integration YAML for an `fs` target:**
+
+```yaml
+version: 1
+integration:
+  id: my-project
+  targets:
+    - id: my-project-src
+      tool: fs
+      config:
+        root: ~/projects/my-project
+        readonly: false   # set true to block all writes
 ```
 
 ### `hexlane credential` — Inspect and manage cached credentials

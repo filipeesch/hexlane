@@ -117,5 +117,6 @@ See [`examples/github.yaml`](examples/github.yaml) for a fully working integrati
 | [Integration Config](docs/integration-config.md) | Integration YAML reference — targets, credential kinds, strategies, auth injection |
 | [HTTP](docs/http.md)                             | Ad-hoc `http call` reference                                                       |
 | [SQL](docs/sql.md)                               | Ad-hoc `sql query` reference                                                       |
+| [File System](docs/fs.md)                        | `fs` tool — read, write, search, rollback against a directory target               |
 
 ---

@@ -16,6 +16,7 @@ Targets can use:
 - `credential.kind: public` — no authentication needed; hexlane calls the endpoint directly with no token
 - `credential.kind: api_token` — token is fetched, cached, and renewed automatically
 - `credential.kind: db_connection` — DB credentials are fetched, cached, and renewed automatically
+- tool `fs` (no credential) — use `hexlane fs` commands; root directory is set in `config.root`
 
 Targets and operations are defined together in an **integration** YAML file and registered with `hexlane integration add`.
 
@@ -125,6 +126,52 @@ hexlane sql query <target-id> \
 
 Always use named parameters (`:name` syntax) — never interpolate values directly into the SQL string.
 
+### File system operations (`fs` targets)
+
+For targets with `tool: fs`, use `hexlane fs` commands.
+
+```bash
+# Read a single file
+hexlane fs read <target-id> --file src/main.ts
+hexlane fs read <target-id> --file src/main.ts --lines 10-50
+# Read multiple files at once (returns { files, skipped })
+hexlane fs read <target-id> --glob "src/**/*.ts"
+
+hexlane fs list <target-id> --glob "**/*.ts" --depth 2
+hexlane fs search <target-id> --pattern "TODO" --glob "**/*.ts" --context 3
+
+# Write (create or overwrite)
+hexlane fs write <target-id> --file src/new.ts --content "export const x = 1;"
+# Patch a line range — use --expect to guard against stale line numbers
+hexlane fs write <target-id> --file src/main.ts \
+  --lines 45-52 --content "  return newValue;" \
+  --expect "return oldValue;"
+
+# Safe single-site edit — preferred for targeted changes (no stale line numbers)
+# --literal = exact string match, --once = error if 0 or >1 occurrences
+hexlane fs replace <target-id> \
+  --file src/main.ts --literal --once \
+  --pattern 'return oldValue;' --replacement 'return newValue;'
+
+# Multi-line edits via files
+hexlane fs replace <target-id> \
+  --file src/main.ts --literal --once \
+  --pattern-file /tmp/old.txt --replacement-file /tmp/new.txt
+
+# Bulk regex replace across files
+hexlane fs replace <target-id> --pattern "OldName" --replacement "NewName" --glob "**/*.ts"
+
+# Move / delete
+hexlane fs move <target-id> --from src/old.ts --to src/new.ts
+hexlane fs delete <target-id> --file src/unused.ts
+
+# Rollback any write operation
+hexlane fs rollback restore <target-id> --operation-id <id>
+hexlane fs rollback list <target-id>
+```
+
+Every write command snapshots the original content and returns an `operationId`. Use `rollback restore` to undo. Always `--dry-run` first when unsure of scope.
+
 ### On authentication errors
 
 ```bash
@@ -162,3 +209,5 @@ hexlane credential set --target <target-id> --connection-string postgresql://use
 - Always `op add` a new operation before running it if one doesn't exist — don't run ad-hoc calls for tasks that will recur
 - Always pass `--machine` for output you will read or parse — the default is human-readable, not model-optimised
 - Pass `--http-headers` only when response headers are needed for the task
+- For `fs` writes: always use `--dry-run` first to verify scope; use `--expect` with `--lines` to guard stale line numbers; use `rollback restore` to undo any write
+- For targeted single-file edits prefer `fs replace --literal --once` over `fs write --lines` — it is position-independent and errors on ambiguity
