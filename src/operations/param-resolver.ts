@@ -35,7 +35,7 @@ export function resolveParams(
     for (const param of operation.parameters) {
         const raw = rawParams[param.name];
 
-        if (raw === undefined || raw === "") {
+        if (raw === undefined) {
             if (param.required !== false) {
                 errors.push(formatMissingError(param));
                 continue;

@@ -51,6 +51,19 @@ describe("resolveParams", () => {
         expect("cursor" in result).toBe(false);
     });
 
+    it("resolves optional string param with empty-string value", () => {
+        const op = makeApiOp([{ name: "component", type: "string", required: false }]);
+        const result = resolveParams(op, { component: "" });
+        expect(result["component"]).toBe("");
+    });
+
+    it("resolves required string param with empty-string value", () => {
+        // An empty string is a valid string value, not the same as missing
+        const op = makeApiOp([{ name: "q", type: "string", required: true }]);
+        const result = resolveParams(op, { q: "" });
+        expect(result["q"]).toBe("");
+    });
+
     it("throws ParamValidationError for missing required param with rich message", () => {
         const op = makeApiOp([{ name: "orderId", type: "string", required: true, description: "Unique order ID" }]);
         expect(() => resolveParams(op, {})).toThrow(ParamValidationError);
@@ -140,5 +153,16 @@ describe("target.params injection via mergedRawParams", () => {
         const op = makeApiOp([{ name: "id", type: "string", required: true }]);
         const result = mergeTargetParams(op, {}, { id: "42" });
         expect(result["id"]).toBe("42");
+    });
+
+    it("resolves optional string param with empty-string default from target.params", () => {
+        // Regression: target.params with component:"" must not be treated as undeclared
+        const op = makeApiOp([
+            { name: "component", type: "string", required: false },
+            { name: "q", type: "string", required: true },
+        ]);
+        const result = mergeTargetParams(op, { component: "" }, { q: "spring" });
+        expect(result["component"]).toBe("");
+        expect(result["q"]).toBe("spring");
     });
 });

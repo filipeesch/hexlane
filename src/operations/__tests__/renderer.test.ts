@@ -29,6 +29,12 @@ describe("renderTemplate", () => {
             .toThrow(TemplateRenderError);
     });
 
+    it("renders empty-string variable without throwing", () => {
+        // Regression: optional param with \"\" default from target.params must render as empty string
+        expect(renderTemplate("/search?q={{ q }}&component={{ component }}", { q: "spring", component: "" }))
+            .toBe("/search?q=spring&component=");
+    });
+
     it("converts boolean false to string 'false'", () => {
         expect(renderTemplate("{{ flag }}", { flag: false })).toBe("false");
     });
