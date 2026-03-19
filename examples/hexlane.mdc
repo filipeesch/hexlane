@@ -1,40 +1,40 @@
 ---
-description: Use hexlane to investigate and test applications — query databases, make authenticated API calls, and manage credentials securely from the CLI.
+description: Use hexlane to investigate and test applications — query databases, make authenticated HTTP calls, and manage credentials securely from the CLI.
 alwaysApply: false
 ---
 
 # hexlane
 
-`hexlane` is a secure CLI tool for investigating and testing applications. It manages credentials automatically (fetches, caches, and auto-renews tokens and DB connections) so you never handle secrets manually.
+`hexlane` is a secure CLI tool for interacting with external systems. It manages credentials automatically (fetches, caches, and auto-renews tokens and DB connections) so you never handle secrets manually.
 
-## Step 1 — Discover Available Apps and Profiles
+## Step 1 — Discover Available Targets
 
-**Always run these two commands before anything else.** They tell you what apps are registered, what environments exist, and which profiles to use.
+**Always run these commands before anything else.** They tell you what targets are registered and what tool/credential type each uses.
 
 ```bash
-# List all registered apps
-hexlane app list
+# List all registered integrations
+hexlane integration list
 
-# Show full config for an app — reveals environments, profiles, and their kind
-hexlane app show <app-id>
+# Show full config for an integration — reveals targets, tool, and credential kind
+hexlane integration show <integration-id>
 ```
 
-The `kind` field in `hexlane app show` output determines which command to use:
-- `public` → use `hexlane api call` or `hexlane op run` — no credentials needed
-- `api_token` → use `hexlane api call` or `hexlane op run` (if an operation is defined)
-- `db_connection` → use `hexlane db query` or `hexlane op run` (if an operation is defined)
+The `credential.kind` field on each target determines what's needed:
+- `public` → use `hexlane http call` or `hexlane op run` — no credentials needed
+- `api_token` → use `hexlane http call` or `hexlane op run` (if an operation is defined)
+- `db_connection` → use `hexlane sql query` or `hexlane op run` (if an operation is defined)
 
 ---
 
 ## Step 2 — Discover Available Operations (Preferred)
 
-If operations are defined for an app, prefer `op run` over raw `api call` / `db query`. Operations are named, typed, and validated — safer for agents.
+If operations are defined for the integration, prefer `op run` over raw `http call` / `sql query`. Operations are named, typed, and validated — safer for agents.
 
 ```bash
-# List all operations (optionally filter by app or text)
-hexlane op list
-hexlane op list --app <app-id>
-hexlane op list --filter orders
+# List all operations — use --filter to search by name, description, or tag
+hexlane op list --filter <keyword>
+hexlane op list --integration <integration-id>
+hexlane op list --integration <integration-id> --filter <keyword>
 
 # Show full metadata, parameters, and examples for an operation
 hexlane op show github/get-user
@@ -42,11 +42,11 @@ hexlane op show github/get-user
 # Dry-run: render the execution template without hitting network or DB
 hexlane op run github/list-issues --param owner=torvalds --param repo=linux --dry-run
 
-# Run an operation (output is TOON by default; pass --json to get JSON)
-hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=open
+# Run an operation — use --machine for structured TOON output (recommended for AI consumption)
+hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=open --machine
 ```
 
-**Operation names are always app-qualified:** `<app-id>/<operation-name>` (e.g. `github/get-user`).
+**Operation names are always target-qualified:** `<target-id>/<operation-name>` (e.g. `github/get-user`).
 
 ---
 
@@ -54,64 +54,62 @@ hexlane op run github/list-issues --param owner=torvalds --param repo=linux --pa
 
 ### `hexlane op` — Run and manage named operations (preferred for known tasks)
 
-Operations are named, typed, discoverable actions defined in app configs. They wrap API calls or DB queries with declared parameters, validation, and examples.
+Operations are named, typed, discoverable actions defined in integrations. They wrap HTTP calls or SQL queries with declared parameters, validation, and examples.
 
 ```bash
-hexlane op list                              # all operations
-hexlane op list --app <app-id>              # filter by app
-hexlane op list --filter <text>             # grep on name/description/tags
-hexlane op show <app/op>                    # full metadata + parameter table
-hexlane op validate <app/op>               # schema + cross-reference validation
-hexlane op run <app/op> \                  # run the operation
-  --env <env> \
-  --profile <profile> \                    # optional if operation has a default profile
-  --param name=value \                     # repeatable, typed, validated
-  [--dry-run]                              # render template only, no execution
-  [--json]                                 # override default TOON output with JSON
+hexlane op list                                         # all operations
+hexlane op list --integration <integration-id>          # filter by integration
+hexlane op list --filter <keyword>                      # search by name, description, or tag
+hexlane op list --integration <id> --filter <keyword>  # combine both
+hexlane op show <target-id>/<op>                        # full metadata + parameter table
+hexlane op validate <target-id>/<op>                    # schema + cross-reference validation
+hexlane op run <target-id>/<op> \                       # run the operation
+  --param name=value \                                 # repeatable, typed, validated
+  --target <target-id> \                               # override executing target (same integration)
+  [--dry-run]                                          # render template only, no execution
+  [--machine]                                          # TOON output — recommended for AI consumption
+  [--json]                                             # raw JSON output
   [--debug] [--limit N]
 
-# Add an operation to a registered app config
+# Add an operation to a registered integration
 hexlane op add \
-  --app <app-id> \                         # required
-  --name <name> \                          # required, lowercase alphanumeric-dashes
-  --kind api|db \                          # required
-  --method GET|POST|PUT|PATCH|DELETE \     # required for api
-  --path "/resource/{{ paramName }}" \     # required for api; {{ var }} for templating
-  --body '{"key": "{{ paramName }}"}' \   # optional request body template (api only)
-  --sql "SELECT * FROM t WHERE id = :id" \ # required for db; ::type casts are safe (e.g. id::text)
-  --param "name:type:required:description" \ # repeatable; type: string|integer|number|boolean
-                                           # third segment: "required" (default) or "optional"
-                                           # only the literal word "optional" marks a param as not required
-  --profile <profile> \                    # optional default profile
-  --default-env <env> \                    # optional default environment
-  --tag <tag> \                            # repeatable
-  --readonly \                             # api only; db defaults to true
+  --integration <integration-id> \               # required
+  --name <name> \                                # required, lowercase alphanumeric-dashes
+  --tool http|sql \                              # required
+  --method GET|POST|PUT|PATCH|DELETE \           # required for http
+  --path "/resource/{{ paramName }}" \           # required for http; {{ var }} for templating
+  --body '{"key": "{{ paramName }}"}' \         # optional request body template (http only)
+  --sql "SELECT * FROM t WHERE id = :id" \       # required for sql; ::type casts are safe
+  --param "name:type:required:description" \     # repeatable; type: string|integer|number|boolean
+                                                 # third segment: "required" (default) or "optional"
+  --default-target <target-id> \                 # optional default target
+  --readonly \                                   # http only; sql defaults to true
   --description "..."
 
-# Remove an operation from a registered app config
-hexlane op delete <app-id>/<operation-name>
+# Remove an operation from a registered integration
+hexlane op delete <integration-id>/<operation-name>
 ```
 
-### `hexlane db query` — Run a SQL query against a registered database
+### `hexlane sql query` — Run a SQL query against a registered database target
 
-Connects using stored credentials for the given app/env/profile. Credentials are acquired and renewed automatically — no passwords needed. A 500-row safety cap is applied unless overridden. **Output is TOON by default.**
+Connects using stored credentials for the given target. Credentials are acquired and renewed automatically — no passwords needed. A 500-row safety cap is applied unless overridden. **Output is TOON by default.**
 
 ```bash
-hexlane db query --app <app> --env <env> --profile <profile> --sql "<SQL>"
+hexlane sql query <target-id> --sql "<SQL>"
 
-# Named parameters (:name placeholders — injection-safe, bound via pg parameterized queries)
+# Named parameters (:name placeholders — injection-safe, bound via parameterized queries)
 # PostgreSQL ::type cast syntax (e.g. id::text, val::boolean) is safe — does NOT conflict with :name params
-hexlane db query --app <app> --env <env> --profile <profile> \
+hexlane sql query <target-id> \
   --sql "SELECT id::text, name FROM table WHERE id = :id" \
   --param id=<value>
 
 # Multiple params
-hexlane db query ... \
+hexlane sql query <target-id> \
   --sql "SELECT * FROM t WHERE a = :x AND b = :y" \
   --param x=foo --param y=bar
 
 # From file
-hexlane db query ... --sql-file ./query.sql
+hexlane sql query <target-id> --sql-file ./query.sql
 
 # Options
 --dry-run       # Preview the final SQL and bound params without connecting to the database
@@ -120,24 +118,24 @@ hexlane db query ... --sql-file ./query.sql
 --debug         # Log credential state, final SQL, param bindings, connection info to stderr
 ```
 
-### `hexlane api call` — Make an authenticated HTTP request
+### `hexlane http call` — Make an authenticated HTTP request
 
-Fetches and injects the Bearer token for the given app/env/profile automatically. The `base_url` is configured in the app — only pass the path. **Always returns a structured envelope `{ status, headers, body }` in TOON format by default.** This means status code and headers are always included in the stdout output — there is no stderr split.
+Fetches and injects the credential for the given target automatically. The `base_url` is configured in the target — only pass the path. **Always returns a structured envelope `{ status, headers?, body }` in TOON format by default.**
 
 ```bash
-hexlane api call --app <app> --env <env> --profile <profile> \
-  --method GET --path /api/v1/resource
+hexlane http call <target-id> /api/v1/resource
 
 # With body
-hexlane api call ... --method POST --path /api/v1/resource \
-  --body '{"key": "value"}'
+hexlane http call <target-id> /api/v1/resource \
+  -m POST --body '{"key": "value"}'
 
 # Body from file
-hexlane api call ... --method POST --path /api/v1/resource \
-  --body-file ./payload.json
+hexlane http call <target-id> /api/v1/resource \
+  -m POST --body-file ./payload.json
 
 # Options
---json    # Override default TOON output with JSON (envelope shape is the same: { status, headers, body })
+--http-headers  # Include response headers in output
+--json    # Override default TOON output with JSON (envelope shape is the same: { status, headers?, body })
 --debug   # Log URL, request headers, and response details to stderr
 ```
 
@@ -146,32 +144,62 @@ hexlane api call ... --method POST --path /api/v1/resource \
 Credentials are acquired and cached automatically on first use. Use these commands to inspect expiry, diagnose auth issues, or force a fresh credential.
 
 ```bash
-hexlane credential list                                                         # all cached credentials with expiry
-hexlane credential revoke --app <app> --env <env> --profile <profile>           # force re-acquire on next use (e.g. after 401)
+hexlane credential list                              # all cached credentials with expiry
+hexlane credential list --integration <id>          # filter by integration
+hexlane credential list --target <target-id>         # filter by target
+hexlane credential inspect --target <target-id>      # show metadata for a target's credential
+hexlane credential revoke --target <target-id>       # force re-acquire on next use (e.g. after 401)
+hexlane credential renew --target <target-id>        # force immediate renewal
+hexlane credential set --target <target-id> \        # store a static credential (acquire_strategy: static)
+  --token <value>                                   # api_token — or omit to pipe from stdin
+hexlane credential set --target <target-id> \        # db_connection static credential
+  --connection-string postgresql://user:pass@host:5432/dbname
 ```
 
-### `hexlane app` — Manage registered app configurations
+### `hexlane integration` — Manage registered integrations
 
-App configs are YAML files that define environments, profiles, and credential acquisition strategies. After adding or updating a config file, re-register it with `app add`.
+Integrations are YAML files that define targets (tool instances) and operations for an external system.
 
 ```bash
-hexlane app list                              # list all registered apps
-hexlane app show <app-id>                     # full config: envs, profiles, strategies
-hexlane app add --file ./app-config.yaml      # register or update an app from a YAML file
-hexlane app validate --file ./app-config.yaml # validate without registering
-hexlane app remove <app-id>                   # remove an app
+hexlane integration list                              # list all registered integrations
+hexlane integration show <integration-id>             # targets, credential kinds, operations
+hexlane integration add --file ./github.yaml          # register or update from a YAML file
+hexlane integration remove <integration-id>           # remove integration and its credentials
 ```
+
+**`target.params` — static per-target template values:** Each target can declare a `params` map of string key-value pairs that are automatically injected into operation template context at `op run` time. The injection uses the literal key name (no conversion). User-supplied `--param` always overrides a `target.params` value for the same key.
+
+```yaml
+# Example: Grafana integration where each target has a different datasourceUid
+version: 1
+integration:
+  id: grafana
+  targets:
+    - id: grafana-staging
+      tool: http
+      config:
+        base_url: https://grafana.staging.example.com
+      params:
+        datasource_uid: ben9xq9lzod8gf   # injected automatically — no --param needed
+      credential:
+        kind: api_token
+        acquire_strategy:
+          kind: static
+```
+
+With this config, `hexlane op run grafana-staging/query-loki --param expr=... --param from=... --param to=...` works without specifying `datasource_uid` each time. For the operation to accept the injected value, declare the param as `required: false` in the operation's `parameters` list.
+
 
 ---
 
 ## Investigation Workflow
 
-1. **Discover apps** — `hexlane app list` + `hexlane app show <app-id>` to find envs and profiles.
-2. **Discover operations** — `hexlane op list --app <app-id>`. If an operation exists for your task, use it.
-3. **Before running an op** — `hexlane op show <app/op>` to read parameter names/types, then `--dry-run` to confirm the rendered execution before it fires.
+1. **Discover integrations** — `hexlane integration list` + `hexlane integration show <id>` to find targets and credential types.
+2. **Discover operations** — `hexlane op list --filter <keyword>` to search by name, description, or tag; or `hexlane op list --integration <id>` to browse by integration. If an operation exists for your task, use it.
+3. **Before running an op** — `hexlane op show <target-id>/<op>` to read parameter names/types, then `--dry-run` to confirm the rendered execution before it fires.
 4. **Use `--param` for all variable values** — never interpolate values into `--sql` or paths.
-5. **Output** — TOON is the default format for all commands. Use `--json` when you specifically need JSON (e.g. piping into a JSON parser). API responses always include `{ status, headers, body }` in one envelope.
-6. **Debug failures** — add `--debug` to trace credential state, SQL, and HTTP details. On 401, run `hexlane credential revoke ...` and retry.
+5. **Output** — Use `--machine` for all output that will be processed by a model (TOON format — structured, stable, easy to parse). Use `--json` when raw JSON is needed. The default format is human-readable (pretty JSON for HTTP, table for SQL).
+6. **Debug failures** — add `--debug` to trace credential state, SQL, and HTTP details. On 401, run `hexlane credential revoke --target <id>` and retry.
 
 ---
 
@@ -179,41 +207,38 @@ hexlane app remove <app-id>                   # remove an app
 
 ```bash
 # 1. Discover what's available
-hexlane app list
-hexlane app show my-app
+hexlane integration list
+hexlane integration show my-app
 
 # 2. Count rows in a table (TOON by default)
-hexlane db query --app <app> --env <env> --profile <profile> \
+hexlane sql query my-app-db-prod \
   --sql "SELECT COUNT(*) FROM my_table"
 
 # 3. Look up a specific record — preview SQL before running
-hexlane db query --app <app> --env <env> --profile <profile> \
+hexlane sql query my-app-db-prod \
   --sql "SELECT * FROM my_table WHERE id = :id" \
   --param id=123 --dry-run
-hexlane db query --app <app> --env <env> --profile <profile> \
+hexlane sql query my-app-db-prod \
   --sql "SELECT * FROM my_table WHERE id = :id" \
   --param id=123
 
 # 4. Use PostgreSQL ::type cast syntax safely alongside :params
-hexlane db query --app <app> --env <env> --profile <profile> \
+hexlane sql query my-app-db-prod \
   --sql "SELECT id::text, created_at::date FROM orders WHERE status = :status" \
   --param status=active
 
-# 5. API call — structured envelope { status, headers, body } in TOON by default
-hexlane api call --app <app> --env <env> --profile <profile> \
-  --method GET --path /api/v1/resource
+# 5. HTTP call — structured envelope { status, body } in TOON by default
+hexlane http call my-app-api-prod /api/v1/resource
 
-# 6. API POST with body
-hexlane api call --app <app> --env <env> --profile <profile> \
-  --method POST --path /api/v1/resource \
-  --body '{"key": "value"}'
+# 6. HTTP POST with body
+hexlane http call my-app-api-prod /api/v1/resource \
+  -m POST --body '{"key": "value"}'
 
 # 7. Debug a failing command
-hexlane api call --app <app> --env <env> --profile <profile> \
-  --method GET --path /api/v1/resource --debug
+hexlane http call my-app-api-prod /api/v1/resource --debug
 
 # 8. Force fresh credential after 401
-hexlane credential revoke --app <app> --env <env> --profile <profile>
+hexlane credential revoke --target my-app-api-prod
 ```
 
 ---

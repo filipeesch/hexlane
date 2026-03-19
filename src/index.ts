@@ -2,10 +2,10 @@
 import { Command } from "commander";
 import { registerAppCommands } from "./cli/commands/app.js";
 import { registerCredentialCommands } from "./cli/commands/credential.js";
-import { registerApiCommands } from "./cli/commands/api.js";
-import { registerDbCommands } from "./cli/commands/db.js";
 import { registerOpCommands } from "./cli/commands/op.js";
+import { registerIntegrationCommands } from "./cli/commands/integration.js";
 import { registerInitCommand, registerAuditCommand, registerVaultCommands } from "./cli/commands/misc.js";
+import { toolRegistry } from "./tools/index.js";
 
 const program = new Command();
 
@@ -18,11 +18,11 @@ program
 registerInitCommand(program);
 registerAppCommands(program);
 registerCredentialCommands(program);
-registerApiCommands(program);
-registerDbCommands(program);
 registerOpCommands(program);
+registerIntegrationCommands(program);
 registerAuditCommand(program);
 registerVaultCommands(program);
+toolRegistry.registerAllCommands(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
     console.error("Fatal:", (err as Error).message ?? String(err));

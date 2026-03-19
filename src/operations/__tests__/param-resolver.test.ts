@@ -83,3 +83,62 @@ describe("resolveParams", () => {
     });
 
 });
+
+// ─── target.params injection (merge pattern used in op run) ──────────────────
+
+describe("target.params injection via mergedRawParams", () => {
+    /** Simulates what op.ts does: filter target.params to known keys, then overlay user --param. */
+    function mergeTargetParams(
+        op: ReturnType<typeof makeApiOp>,
+        targetParams: Record<string, string>,
+        userParams: Record<string, string>,
+    ) {
+        const knownNames = new Set(op.parameters.map((p) => p.name));
+        const filtered = Object.fromEntries(
+            Object.entries(targetParams).filter(([k]) => knownNames.has(k))
+        );
+        return resolveParams(op, { ...filtered, ...userParams });
+    }
+
+    it("injects target param for optional field not supplied by user", () => {
+        const op = makeApiOp([
+            { name: "uid", type: "string", required: false },
+            { name: "expr", type: "string", required: true },
+        ]);
+        const result = mergeTargetParams(op, { uid: "abc123" }, { expr: "sum(rate(...))" });
+        expect(result["uid"]).toBe("abc123");
+        expect(result["expr"]).toBe("sum(rate(...))");
+    });
+
+    it("user --param overrides target.params for same key", () => {
+        const op = makeApiOp([
+            { name: "uid", type: "string", required: false },
+        ]);
+        const result = mergeTargetParams(op, { uid: "from-target" }, { uid: "from-user" });
+        expect(result["uid"]).toBe("from-user");
+    });
+
+    it("target.params keys not declared in operation are silently ignored", () => {
+        const op = makeApiOp([{ name: "expr", type: "string", required: true }]);
+        // "uid" is not declared — should not cause an unknown-param error
+        expect(() => mergeTargetParams(op, { uid: "abc123" }, { expr: "up" })).not.toThrow();
+        const result = mergeTargetParams(op, { uid: "abc123" }, { expr: "up" });
+        expect("uid" in result).toBe(false);
+        expect(result["expr"]).toBe("up");
+    });
+
+    it("missing required param not satisfied by target.params still throws", () => {
+        const op = makeApiOp([
+            { name: "expr", type: "string", required: true },
+            { name: "uid", type: "string", required: true },
+        ]);
+        // target provides uid but not expr; user provides neither
+        expect(() => mergeTargetParams(op, { uid: "abc123" }, {})).toThrow(ParamValidationError);
+    });
+
+    it("does not break when target.params is undefined (empty object)", () => {
+        const op = makeApiOp([{ name: "id", type: "string", required: true }]);
+        const result = mergeTargetParams(op, {}, { id: "42" });
+        expect(result["id"]).toBe("42");
+    });
+});

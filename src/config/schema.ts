@@ -64,7 +64,7 @@ const StaticStrategySchema = z.object({
     kind: z.literal("static"),
 });
 
-const StrategySchema = z.discriminatedUnion("kind", [
+export const StrategySchema = z.discriminatedUnion("kind", [
     ShellStrategySchema,
     HttpStrategySchema,
     StaticStrategySchema,
@@ -88,7 +88,7 @@ const QueryParamAuthSchema = z.object({
     name: z.string().min(1),  // e.g. "api_key"
 });
 
-const AuthSchema = z.discriminatedUnion("kind", [
+export const AuthSchema = z.discriminatedUnion("kind", [
     BearerAuthSchema,
     HeaderAuthSchema,
     QueryParamAuthSchema,
@@ -96,7 +96,7 @@ const AuthSchema = z.discriminatedUnion("kind", [
 
 // ─── Renewal Policy ──────────────────────────────────────────────────────────
 
-const RenewalPolicySchema = z.object({
+export const RenewalPolicySchema = z.object({
     // Mandatory when strategy output has no parseable expiry
     ttl: z.number().int().positive().optional(),
     // Seconds before expiry to trigger proactive renewal (default: 300)

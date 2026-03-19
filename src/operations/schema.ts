@@ -78,3 +78,49 @@ export interface LoadedOperation {
     /** Qualified reference: "appId/name" */
     ref: string;
 }
+
+// ─── New operations (discriminated union on tool) ─────────────────────────────
+// These replace the kind-based operations above. Operations reference a `tool`
+// instead of a `kind`, and the `defaultTarget` field replaces `defaultEnv` +
+// `profile`. The old kind-based types are preserved for backward compatibility
+// while the migration is in progress.
+
+const NewOperationBaseSchema = z.object({
+    name: z.string().min(1).regex(/^[a-z0-9-]+$/, "Operation name must be lowercase alphanumeric with dashes"),
+    description: z.string().optional(),
+    // Optional default target for `op run` when no target is given as prefix.
+    defaultTarget: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    parameters: z.array(OperationParameterSchema).default([]),
+    examples: z.array(OperationExampleSchema).optional(),
+});
+
+export const HttpOperationSchema = NewOperationBaseSchema.extend({
+    tool: z.literal("http"),
+    readOnly: z.boolean().optional(),
+    execution: ApiExecutionSchema,
+});
+
+export const SqlOperationSchema = NewOperationBaseSchema.extend({
+    tool: z.literal("sql"),
+    readOnly: z.boolean().default(true),
+    execution: DbExecutionSchema,
+});
+
+export const ToolOperationSchema = z.discriminatedUnion("tool", [
+    HttpOperationSchema,
+    SqlOperationSchema,
+]);
+
+export type HttpOperation = z.infer<typeof HttpOperationSchema>;
+export type SqlOperation = z.infer<typeof SqlOperationSchema>;
+export type ToolOperation = z.infer<typeof ToolOperationSchema>;
+
+// ─── Loaded tool operation (operation + its parent app id) ───────────────────
+
+export interface LoadedToolOperation {
+    appId: string;
+    operation: ToolOperation;
+    /** Qualified reference: "appId/name" */
+    ref: string;
+}
