@@ -17,6 +17,7 @@ Prefer `op run` over raw `http call` / `sql query` whenever an operation exists 
 ```bash
 hexlane op list                                  # all operations across all integrations
 hexlane op list --integration <integration-id>   # filter by integration
+hexlane op list --filter <text>                  # case-insensitive search (name, description, tags)
 
 hexlane op show <target-id>/<op-name>            # full metadata: params, execution, examples
 hexlane op validate <target-id>/<op-name>        # schema + cross-reference validation
@@ -67,6 +68,7 @@ hexlane op run my-app-api-prod/get-account --param id=123 --debug
 | Flag                | Description                                                  |
 | ------------------- | ------------------------------------------------------------ |
 | `--param key=value` | Parameter value — repeatable                                 |
+| `--target <id>`     | Run against a different target in the same integration       |
 | `--dry-run`         | Render templates and print plan, no execution                |
 | `--limit <n>`       | Max rows for SQL operations (default: 500)                   |
 | `--http-headers`    | Include response headers in output (http ops only)           |

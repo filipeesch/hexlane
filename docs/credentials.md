@@ -22,7 +22,9 @@ All secret values (tokens, passwords) are stored encrypted in the vault. SQLite 
 ```bash
 # List all cached credentials (metadata only — no secrets shown)
 hexlane credential list
-hexlane credential list --status expired   # active (default) | expired | revoked | all
+hexlane credential list --integration <id>     # filter by integration
+hexlane credential list --target <target-id>   # filter by target
+hexlane credential list --status expired       # active (default) | expired | revoked | all
 
 # Show metadata for a specific credential
 hexlane credential inspect --target <id>

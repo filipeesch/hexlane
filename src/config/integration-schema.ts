@@ -45,6 +45,7 @@ export const IntegrationTargetSchema = z.object({
     id: z.string().min(1).regex(/^[a-z0-9-]+$/, "Target ID must be lowercase alphanumeric with dashes"),
     tool: z.enum(["http", "sql"]),
     config: z.record(z.string(), z.unknown()).default({}),
+    params: z.record(z.string(), z.string()).optional(),
     credential: IntegrationTargetCredentialSchema.optional(),
 });
 

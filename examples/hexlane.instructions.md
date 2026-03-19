@@ -24,10 +24,12 @@ Targets and operations are defined together in an **integration** YAML file and 
 Before performing any task against an external system, always discover first:
 
 ```bash
-hexlane integration list                          # see all registered integrations
-hexlane integration show <integration-id>         # see targets and credential config
-hexlane op list --integration <integration-id>    # see available operations
-hexlane op show <target-id>/<op-name>             # see full details: params, execution, examples
+hexlane integration list                                        # see all registered integrations
+hexlane integration show <integration-id>                       # see targets and credential config
+hexlane op list --filter <keyword>                              # search operations by name, description, or tag
+hexlane op list --integration <integration-id>                  # browse by integration
+hexlane op list --integration <integration-id> --filter <keyword>  # combine both
+hexlane op show <target-id>/<op-name>                           # see full details: params, execution, examples
 ```
 
 ### Running operations
@@ -42,7 +44,7 @@ Default output format:
 - **HTTP operations**: pretty-printed JSON `{ "status": 200, "body": { ... } }` — headers hidden unless `--http-headers` is passed
 - **SQL operations**: table of rows
 
-Use `--machine` to get TOON output (structured, consistent format well-suited for model consumption). Use `--json` for raw JSON.
+**Always pass `--machine`** when the output will be consumed by a model. This produces TOON — a structured, consistent format optimised for AI parsing. Use `--json` only when raw JSON is explicitly needed.
 
 Always use `--dry-run` first to confirm the rendered request before executing:
 
@@ -80,6 +82,24 @@ hexlane op add \
 
 If the user provides an OpenAPI spec, use the paths, methods, and parameter definitions from it to create accurate operations.
 
+### `target.params` — static parameter defaults per target
+
+Each target in an integration YAML can declare a `params` map. These values are automatically injected into the operation template at `op run` time, using the literal key name. User-supplied `--param` overrides a `target.params` value for the same key.
+
+This is useful when the same operation is used across multiple targets but a template variable (like `datasource_uid`) differs by target:
+
+```yaml
+targets:
+  - id: grafana-staging
+    tool: http
+    config:
+      base_url: https://grafana.staging.example.com
+    params:
+      datasource_uid: ben9xq9lzod8gf
+```
+
+For the injected key to be accepted, declare it as `optional` in the operation's `parameters` list. The dry-run output will include a `target_params` field showing what was injected.
+
 ### Ad-hoc HTTP calls (when no operation is appropriate)
 
 ```bash
@@ -114,6 +134,18 @@ hexlane credential revoke --target <target-id>
 
 Add `--debug` to any command to trace the full credential acquisition and request cycle.
 
+For targets with `acquire_strategy: static`, load the credential manually with `credential set`:
+
+```bash
+# API token
+hexlane credential set --target <target-id> --token <value>
+# or pipe from stdin
+echo "$MY_TOKEN" | hexlane credential set --target <target-id>
+
+# DB connection string
+hexlane credential set --target <target-id> --connection-string postgresql://user:pass@host:5432/dbname
+```
+
 ### Parameter format for `--param` in `op add`
 
 `name:type:required_or_optional:description`
@@ -126,7 +158,7 @@ Add `--debug` to any command to trace the full credential acquisition and reques
 
 - Never construct raw HTTP requests or connection strings yourself — always go through hexlane
 - Never interpolate variable values into `--path` or `--sql` strings — always use `--param`
-- Always check `op list --integration <id>` before reaching for `http call` or `sql query`
+- Always use `op list --filter <keyword>` to search for relevant operations before reaching for `http call` or `sql query`
 - Always `op add` a new operation before running it if one doesn't exist — don't run ad-hoc calls for tasks that will recur
-- Use `--machine` when you need structured TOON output; the default format is human-readable (pretty JSON for HTTP, table for SQL)
+- Always pass `--machine` for output you will read or parse — the default is human-readable, not model-optimised
 - Pass `--http-headers` only when response headers are needed for the task

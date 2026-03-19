@@ -63,19 +63,22 @@ npm link        # installs the `hexlane` binary globally via npm link
 The fastest way to try hexlane is with the GitHub example — it uses public endpoints, so no credentials or setup are needed.
 
 ```bash
-# 1. Register the GitHub integration
+# 1. Initialize hexlane (run once — sets up local storage and vault passphrase)
+hexlane init
+
+# 2. Register the GitHub integration
 hexlane integration add --file examples/github.yaml
 
-# 2. See what operations are available
-hexlane op list --integration github
+# 3. See what operations are available
+hexlane op list
 
-# 3. Preview a request before running it
+# 4. Preview a request before running it
 hexlane op run github/get-user --param username=torvalds --dry-run
 
-# 4. Run it
+# 5. Run it
 hexlane op run github/get-user --param username=torvalds
 
-# 5. Use filters — list open issues, 10 per page
+# 6. Use filters — list open issues, 10 per page
 hexlane op run github/list-issues \
   --param owner=torvalds --param repo=linux \
   --param state=open --param perPage=10
@@ -112,6 +115,7 @@ See [`examples/github.yaml`](examples/github.yaml) for a fully working integrati
 | [Operations](docs/operations.md)                 | Define, discover, and run named operations; template syntax; AI tips               |
 | [Credentials](docs/credentials.md)               | Credential lifecycle, static tokens, static DB connections, vault architecture     |
 | [Integration Config](docs/integration-config.md) | Integration YAML reference — targets, credential kinds, strategies, auth injection |
-| [HTTP & SQL](docs/http-sql.md)                   | Ad-hoc `http call` and `sql query` reference                                       |
+| [HTTP](docs/http.md)                             | Ad-hoc `http call` reference                                                       |
+| [SQL](docs/sql.md)                               | Ad-hoc `sql query` reference                                                       |
 
 ---

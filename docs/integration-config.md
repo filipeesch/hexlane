@@ -26,6 +26,8 @@ integration:
       tool: http              # "http" or "sql"
       config:
         base_url: https://api.example.com
+      params:                 # optional — static key-value pairs injected into op templates
+        datasource_uid: abc123
       credential:
         kind: public
 
@@ -112,6 +114,47 @@ targets:
       acquire_strategy:
         kind: static
 ```
+
+---
+
+## `params` — Static per-target template values
+
+Each target can declare a `params` map of string key-value pairs. These are automatically injected into the operation template context at `op run` time, using the **literal key name** (no conversion). User-supplied `--param` always overrides a `target.params` value for the same key.
+
+This is useful when the same operation runs against multiple targets but a template variable differs per target:
+
+```yaml
+targets:
+  - id: grafana-staging
+    tool: http
+    config:
+      base_url: https://grafana.staging.example.com
+    params:
+      datasource_uid: ben9xq9lzod8gf   # injected automatically — no --param needed
+    credential:
+      kind: api_token
+      acquire_strategy:
+        kind: static
+      auth:
+        kind: bearer
+
+  - id: grafana-prod
+    tool: http
+    config:
+      base_url: https://grafana.prod.example.com
+    params:
+      datasource_uid: "000000029"
+    credential:
+      kind: api_token
+      acquire_strategy:
+        kind: static
+      auth:
+        kind: bearer
+```
+
+For the injected key to be accepted without error, declare it as `required: false` in the operation's `parameters` list. Only keys that the operation declares are injected — extra keys in `params` are silently ignored, so a single shared `params` block won't break operations that don't use every key.
+
+The `--dry-run` output includes a `target_params` field showing exactly what was injected.
 
 ---
 

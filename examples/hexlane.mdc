@@ -31,9 +31,10 @@ The `credential.kind` field on each target determines what's needed:
 If operations are defined for the integration, prefer `op run` over raw `http call` / `sql query`. Operations are named, typed, and validated — safer for agents.
 
 ```bash
-# List all operations (optionally filter by integration)
-hexlane op list
+# List all operations — use --filter to search by name, description, or tag
+hexlane op list --filter <keyword>
 hexlane op list --integration <integration-id>
+hexlane op list --integration <integration-id> --filter <keyword>
 
 # Show full metadata, parameters, and examples for an operation
 hexlane op show github/get-user
@@ -41,8 +42,8 @@ hexlane op show github/get-user
 # Dry-run: render the execution template without hitting network or DB
 hexlane op run github/list-issues --param owner=torvalds --param repo=linux --dry-run
 
-# Run an operation
-hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=open
+# Run an operation — use --machine for structured TOON output (recommended for AI consumption)
+hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=open --machine
 ```
 
 **Operation names are always target-qualified:** `<target-id>/<operation-name>` (e.g. `github/get-user`).
@@ -56,14 +57,18 @@ hexlane op run github/list-issues --param owner=torvalds --param repo=linux --pa
 Operations are named, typed, discoverable actions defined in integrations. They wrap HTTP calls or SQL queries with declared parameters, validation, and examples.
 
 ```bash
-hexlane op list                                    # all operations
-hexlane op list --integration <integration-id>    # filter by integration
-hexlane op show <target-id>/<op>                  # full metadata + parameter table
-hexlane op validate <target-id>/<op>              # schema + cross-reference validation
-hexlane op run <target-id>/<op> \                 # run the operation
-  --param name=value \                           # repeatable, typed, validated
-  [--dry-run]                                    # render template only, no execution
-  [--json]                                       # raw JSON output
+hexlane op list                                         # all operations
+hexlane op list --integration <integration-id>          # filter by integration
+hexlane op list --filter <keyword>                      # search by name, description, or tag
+hexlane op list --integration <id> --filter <keyword>  # combine both
+hexlane op show <target-id>/<op>                        # full metadata + parameter table
+hexlane op validate <target-id>/<op>                    # schema + cross-reference validation
+hexlane op run <target-id>/<op> \                       # run the operation
+  --param name=value \                                 # repeatable, typed, validated
+  --target <target-id> \                               # override executing target (same integration)
+  [--dry-run]                                          # render template only, no execution
+  [--machine]                                          # TOON output — recommended for AI consumption
+  [--json]                                             # raw JSON output
   [--debug] [--limit N]
 
 # Add an operation to a registered integration
@@ -140,7 +145,15 @@ Credentials are acquired and cached automatically on first use. Use these comman
 
 ```bash
 hexlane credential list                              # all cached credentials with expiry
+hexlane credential list --integration <id>          # filter by integration
+hexlane credential list --target <target-id>         # filter by target
+hexlane credential inspect --target <target-id>      # show metadata for a target's credential
 hexlane credential revoke --target <target-id>       # force re-acquire on next use (e.g. after 401)
+hexlane credential renew --target <target-id>        # force immediate renewal
+hexlane credential set --target <target-id> \        # store a static credential (acquire_strategy: static)
+  --token <value>                                   # api_token — or omit to pipe from stdin
+hexlane credential set --target <target-id> \        # db_connection static credential
+  --connection-string postgresql://user:pass@host:5432/dbname
 ```
 
 ### `hexlane integration` — Manage registered integrations
@@ -154,15 +167,38 @@ hexlane integration add --file ./github.yaml          # register or update from 
 hexlane integration remove <integration-id>           # remove integration and its credentials
 ```
 
+**`target.params` — static per-target template values:** Each target can declare a `params` map of string key-value pairs that are automatically injected into operation template context at `op run` time. The injection uses the literal key name (no conversion). User-supplied `--param` always overrides a `target.params` value for the same key.
+
+```yaml
+# Example: Grafana integration where each target has a different datasourceUid
+version: 1
+integration:
+  id: grafana
+  targets:
+    - id: grafana-staging
+      tool: http
+      config:
+        base_url: https://grafana.staging.example.com
+      params:
+        datasource_uid: ben9xq9lzod8gf   # injected automatically — no --param needed
+      credential:
+        kind: api_token
+        acquire_strategy:
+          kind: static
+```
+
+With this config, `hexlane op run grafana-staging/query-loki --param expr=... --param from=... --param to=...` works without specifying `datasource_uid` each time. For the operation to accept the injected value, declare the param as `required: false` in the operation's `parameters` list.
+
+
 ---
 
 ## Investigation Workflow
 
 1. **Discover integrations** — `hexlane integration list` + `hexlane integration show <id>` to find targets and credential types.
-2. **Discover operations** — `hexlane op list --integration <id>`. If an operation exists for your task, use it.
+2. **Discover operations** — `hexlane op list --filter <keyword>` to search by name, description, or tag; or `hexlane op list --integration <id>` to browse by integration. If an operation exists for your task, use it.
 3. **Before running an op** — `hexlane op show <target-id>/<op>` to read parameter names/types, then `--dry-run` to confirm the rendered execution before it fires.
 4. **Use `--param` for all variable values** — never interpolate values into `--sql` or paths.
-5. **Output** — TOON is the default format for all commands. Use `--json` when you need JSON (e.g. piping into a JSON parser).
+5. **Output** — Use `--machine` for all output that will be processed by a model (TOON format — structured, stable, easy to parse). Use `--json` when raw JSON is needed. The default format is human-readable (pretty JSON for HTTP, table for SQL).
 6. **Debug failures** — add `--debug` to trace credential state, SQL, and HTTP details. On 401, run `hexlane credential revoke --target <id>` and retry.
 
 ---

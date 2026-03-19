@@ -237,6 +237,7 @@ export function registerOpCommands(program: Command): void {
     op
         .command("run <ref>")
         .description("Run an operation (e.g. hexlane op run bsp-forno/list-broker-integrations)")
+        .option("--target <target-id>", "Override the executing target (must belong to the same integration as the op)")
         .option("--env <name>", "Environment name (legacy model — overrides defaultEnv from the operation)")
         .option("--profile <name>", "Profile name (legacy model — overrides default profile from the operation)")
         .option("--param <key=value>", "Parameter value, repeatable", (val: string, prev: string[]) => [...prev, val], [] as string[])
@@ -247,6 +248,7 @@ export function registerOpCommands(program: Command): void {
         .option("--machine", "Output as TOON (structured format for AI/scripting consumption)")
         .option("--debug", "Enable verbose debug logging to stderr")
         .action(async (ref: string, opts: {
+            target?: string;
             env?: string;
             profile?: string;
             param: string[];
@@ -274,13 +276,29 @@ export function registerOpCommands(program: Command): void {
 
                 // ── Try new integration model first ──────────────────────────
                 const intRegistry = new IntegrationOperationRegistry(ctx.integrations);
-                if (intRegistry.hasTargetRef(ref)) {
-                    const intEntry = intRegistry.lookupByTargetRef(ref);
+                if (intRegistry.hasTargetRef(ref) || opts.target) {
+                    const intEntry = opts.target
+                        ? intRegistry.lookupWithTargetOverride(ref, opts.target)
+                        : intRegistry.lookupByTargetRef(ref);
                     const { integrationId, targetId, operation } = intEntry;
+
+                    const intConfig = ctx.integrations.get(integrationId);
+                    const target = intConfig.integration.targets.find((t) => t.id === targetId);
+                    if (!target) {
+                        die(`Target "${targetId}" not found in integration "${integrationId}".`);
+                        return;
+                    }
+
+                    // target.params are the base; only inject keys this operation declares
+                    const knownParamNames = new Set(operation.parameters.map((p) => p.name));
+                    const filteredTargetParams = Object.fromEntries(
+                        Object.entries(target.params ?? {}).filter(([k]) => knownParamNames.has(k))
+                    );
+                    const mergedRawParams = { ...filteredTargetParams, ...rawParams };
 
                     let resolvedParams;
                     try {
-                        resolvedParams = resolveParams(operation, rawParams);
+                        resolvedParams = resolveParams(operation, mergedRawParams);
                     } catch (err) {
                         if (err instanceof ParamValidationError) die(err.message);
                         throw err;
@@ -299,28 +317,29 @@ export function registerOpCommands(program: Command): void {
                             if (rendered.query) plan["query"] = rendered.query;
                             if (rendered.headers) plan["headers"] = rendered.headers;
                             if (rendered.body) plan["body"] = rendered.body;
+                            if (target.params && Object.keys(target.params).length > 0) {
+                                plan["target_params"] = target.params;
+                            }
                             output(plan);
                         } else {
                             const rendered = renderDbExecution(operation.execution, resolvedParams);
-                            output({
+                            const plan: Record<string, unknown> = {
                                 "dry-run": true,
                                 ref,
                                 target: targetId,
                                 sql: rendered.sql,
                                 params: rendered.params,
-                            });
+                            };
+                            if (target.params && Object.keys(target.params).length > 0) {
+                                plan["target_params"] = target.params;
+                            }
+                            output(plan);
                         }
                         return;
                     }
 
                     await ctx.vault.unlock();
 
-                    const config = ctx.integrations.get(integrationId);
-                    const target = config.integration.targets.find((t) => t.id === targetId);
-                    if (!target) {
-                        die(`Target "${targetId}" not found in integration "${integrationId}".`);
-                        return;
-                    }
                     if (!target.credential) {
                         die(`Target "${targetId}" has no credential configured.`);
                         return;
