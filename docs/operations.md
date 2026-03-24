@@ -75,16 +75,16 @@ hexlane op run my-app/get-account --param id=123 --debug
 
 **Options:**
 
-| Flag                | Description                                                          |
-| ------------------- | -------------------------------------------------------------------- |
-| `--param key=value` | Parameter value — repeatable                                         |
+| Flag                | Description                                                           |
+| ------------------- | --------------------------------------------------------------------- |
+| `--param key=value` | Parameter value — repeatable                                          |
 | `--target <id>`     | Run against a specific target (overrides `integration.defaultTarget`) |
-| `--dry-run`         | Render templates and print plan, no execution                        |
-| `--limit <n>`       | Max rows for SQL operations (default: 500)                           |
-| `--http-headers`    | Include response headers in output (http ops only)                   |
-| `--machine`         | Output TOON (structured format for AI/scripting consumption)         |
-| `--json`            | Output raw JSON                                                      |
-| `--debug`           | Log credential state, SQL, and HTTP details to stderr                |
+| `--dry-run`         | Render templates and print plan, no execution                         |
+| `--limit <n>`       | Max rows for SQL operations (default: 500)                            |
+| `--http-headers`    | Include response headers in output (http ops only)                    |
+| `--machine`         | Output TOON (structured format for AI/scripting consumption)          |
+| `--json`            | Output raw JSON                                                       |
+| `--debug`           | Log credential state, SQL, and HTTP details to stderr                 |
 
 ---
 
