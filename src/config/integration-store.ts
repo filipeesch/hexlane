@@ -121,4 +121,37 @@ export class IntegrationStore {
         }
         return undefined;
     }
+
+    /**
+     * Find all integrations that own a given target ID.
+     * Used for disambiguation when the same target ID exists in multiple integrations.
+     */
+    findAllByTargetId(targetId: string): Array<{ integrationId: string; target: IntegrationTarget }> {
+        const registry = this.readRegistry();
+        const results: Array<{ integrationId: string; target: IntegrationTarget }> = [];
+        for (const [integrationId, entry] of Object.entries(registry.integrations)) {
+            try {
+                const config = loadIntegrationConfig(entry.config_path);
+                const target = config.integration.targets.find((t) => t.id === targetId);
+                if (target) {
+                    results.push({ integrationId, target });
+                }
+            } catch {
+                // Skip integrations that fail to load
+            }
+        }
+        return results;
+    }
+
+    /**
+     * Check whether a target ID exists in a specific integration config.
+     */
+    targetExistsInIntegration(integrationId: string, targetId: string): boolean {
+        try {
+            const config = this.get(integrationId);
+            return config.integration.targets.some((t) => t.id === targetId);
+        } catch {
+            return false;
+        }
+    }
 }

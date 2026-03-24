@@ -349,4 +349,115 @@ export function registerCredentialCommands(program: Command): void {
                 die((e as Error).message);
             }
         });
+
+    cred
+        .command("move")
+        .description("Move all credentials from one target ID to another (e.g. after renaming a target)")
+        .requiredOption("--from <target-id>", "Source target ID")
+        .requiredOption("--to <target-id>", "Destination target ID (raw — need not exist in config yet)")
+        .option("--integration <id>", "Integration ID (required when --from is ambiguous)")
+        .option("--force", "Overwrite destination credential if it already exists")
+        .option("--json", "Output as JSON")
+        .action(async (opts: { from: string; to: string; integration?: string; force?: boolean; json?: boolean }) => {
+            if (opts.json) setJsonMode(true);
+            try {
+                const ctx = getContext();
+
+                // ── Resolve integration for the source target ─────────────────────
+                let integrationId: string;
+                if (opts.integration) {
+                    // Explicit integration supplied — just verify the integration exists.
+                    // We do NOT check that the source target exists in the config, because
+                    // the source target may have already been renamed/removed from YAML.
+                    ctx.integrations.get(opts.integration); // throws if integration is not registered
+                    integrationId = opts.integration;
+                } else {
+                    const matches = ctx.integrations.findAllByTargetId(opts.from);
+                    if (matches.length === 0) {
+                        die(`Target "${opts.from}" not found in any registered integration.`);
+                        return;
+                    }
+                    if (matches.length > 1) {
+                        const ids = matches.map((m) => m.integrationId).join(", ");
+                        die(`Target "${opts.from}" exists in multiple integrations: ${ids}. Use --integration <id> to disambiguate.`);
+                        return;
+                    }
+                    integrationId = matches[0].integrationId;
+                }
+
+                // ── Warn if destination target doesn't exist in config ─────────────
+                if (!ctx.integrations.targetExistsInIntegration(integrationId, opts.to)) {
+                    process.stderr.write(
+                        `Warning: target "${opts.to}" does not exist in integration "${integrationId}" config. ` +
+                        `Make sure to update the integration YAML after moving credentials.\n`
+                    );
+                }
+
+                // ── Find all credential records for the source target ──────────────
+                const records = ctx.metadata.listByTarget(integrationId, opts.from);
+                if (records.length === 0) {
+                    die(`No credentials found for target "${opts.from}" in integration "${integrationId}".`);
+                    return;
+                }
+
+                await ctx.vault.unlock();
+
+                // ── Collision check (before touching anything) ────────────────────
+                if (!opts.force) {
+                    const collisions: string[] = [];
+                    for (const record of records) {
+                        const newVaultRef = VaultManager.vaultRef(integrationId, opts.to, record.profile);
+                        if (ctx.vault.exists(newVaultRef)) {
+                            collisions.push(record.profile);
+                        }
+                    }
+                    if (collisions.length > 0) {
+                        die(
+                            `Destination target "${opts.to}" already has credential(s) for: ${collisions.join(", ")}. ` +
+                            `Use --force to overwrite.`
+                        );
+                        return;
+                    }
+                }
+
+                // ── Move each credential record ───────────────────────────────────
+                const moved: Array<{ kind: string; from: string; to: string; expires_at: string | null }> = [];
+                const now = new Date().toISOString();
+
+                for (const record of records) {
+                    const oldVaultRef = record.vault_ref;
+                    const newVaultRef = VaultManager.vaultRef(integrationId, opts.to, record.profile);
+
+                    // Read secret from old vault slot
+                    const secret = ctx.vault.read(oldVaultRef);
+
+                    // Write to new vault slot
+                    ctx.vault.write(newVaultRef, secret);
+
+                    // Upsert metadata record under the new target
+                    ctx.metadata.upsert({
+                        ...record,
+                        id: crypto.randomUUID(),
+                        env: opts.to,
+                        vault_ref: newVaultRef,
+                        updated_at: now,
+                        last_used_at: null,
+                    });
+
+                    // Clean up old vault + metadata
+                    ctx.vault.delete(oldVaultRef);
+                    ctx.metadata.delete(record.id);
+
+                    moved.push({ kind: record.kind, from: opts.from, to: opts.to, expires_at: record.expires_at });
+                }
+
+                output({
+                    message: `Moved ${moved.length} credential(s) from "${opts.from}" to "${opts.to}"`,
+                    integration: integrationId,
+                    moved,
+                });
+            } catch (e: unknown) {
+                die((e as Error).message);
+            }
+        });
 }

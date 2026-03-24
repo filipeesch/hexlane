@@ -157,6 +157,16 @@ export class MetadataStore {
             .all(new Date().toISOString()) as CredentialRecord[];
     }
 
+    /**
+     * List all credential records for a given integration + target (env), regardless of status.
+     * Used by credential move to enumerate all entries to relocate.
+     */
+    listByTarget(app: string, env: string): CredentialRecord[] {
+        return this.db
+            .prepare("SELECT * FROM credentials WHERE app = ? AND env = ? ORDER BY profile")
+            .all(app, env) as CredentialRecord[];
+    }
+
     delete(id: string): void {
         this.db.prepare("DELETE FROM credentials WHERE id = ?").run(id);
     }
