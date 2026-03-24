@@ -1,11 +1,11 @@
 # Operations
 
-Operations are named, typed, discoverable actions defined inside an **integration** — a single YAML file that groups targets and operations for one external system. They wrap HTTP calls or SQL queries with declared parameters, path/query/body templating, and a default target. Every operation created by an AI agent or a human persists and becomes a reusable building block for future sessions.
+Operations are named, typed, discoverable actions defined inside an **integration** — a single YAML file that groups targets and operations for one external system. They wrap HTTP calls or SQL queries with declared parameters, path/query/body templating, and optional target selection. Every operation created by an AI agent or a human persists and becomes a reusable building block for future sessions.
 
-A **target** is a named, configured instance of a tool (`http` or `sql`) within an integration. You run operations through a target:
+A **target** is a named instance that exposes one or more tools (`http`, `sql`, `fs`) within an integration. You run operations through a target, identified by the integration they belong to:
 
 ```
-hexlane op run <target-id>/<op-name>
+hexlane op run <integration-id>/<op-name>
 ```
 
 Prefer `op run` over raw `http call` / `sql query` whenever an operation exists for the task.
@@ -17,24 +17,31 @@ Prefer `op run` over raw `http call` / `sql query` whenever an operation exists 
 ```bash
 hexlane op list                                  # all operations across all integrations
 hexlane op list --integration <integration-id>   # filter by integration
-hexlane op list --filter <text>                  # case-insensitive search (name, description, tags)
+hexlane op list --filter <text>                  # case-insensitive search (ref, tool, name, description, tags)
 
-hexlane op show <target-id>/<op-name>            # full metadata: params, execution, examples
-hexlane op validate <target-id>/<op-name>        # schema + cross-reference validation
+hexlane op show <integration-id>/<op-name>            # raw YAML of the operation (pipeable)
+hexlane op targets <integration-id>/<op-name>         # list targets compatible with this operation
+hexlane op validate <integration-id>/<op-name>        # schema + cross-reference validation
 ```
 
-`op show` prints the operation's tool type, default target, all declared parameters (name, type, required, description), the execution template, and any examples. Always run it before `op run` on an unfamiliar operation.
+`op show` prints the raw YAML of the operation — useful for inspection and piping to `op edit`. `op targets` lists all targets in the integration whose `tools` array contains a matching tool type, and marks the default target with `✓`.
+
+Always check `op targets` when you're unsure which target to use or when `op run` fails with a "no default target" error.
 
 ---
 
 ## Running operations
 
 ```bash
-hexlane op run <target-id>/<op-name> \
+hexlane op run <integration-id>/<op-name> \
   --param key=value    # repeatable
 ```
 
-The target is the namespace — it specifies both the system to call and where to find the credentials. `--param` values are substituted into path/query/body/SQL templates.
+The integration scopes which system to call and where to find credentials. The operation runs against `integration.defaultTarget` when `--target` is not given. If neither is set, `op run` exits with an error listing the compatible targets — run `hexlane op targets <integration-id>/<op-name>` to see them. Use `--target` to pick a specific target:
+
+```bash
+hexlane op run <integration-id>/<op-name> --target <target-id>
+```
 
 ```bash
 # Dry-run — renders all templates and prints the plan, no execution
@@ -44,6 +51,9 @@ hexlane op run github/list-issues \
 
 # Live run — default output: pretty-printed { status, body } for http ops, table for sql ops
 hexlane op run github/get-user --param username=torvalds
+
+# Run against a specific target (overrides integration.defaultTarget)
+hexlane op run github/get-user --target github-enterprise --param username=torvalds
 
 # Include response headers (http ops only)
 hexlane op run github/get-user --param username=torvalds --http-headers
@@ -56,25 +66,25 @@ hexlane op run github/get-repo \
 hexlane op run github/get-user --param username=torvalds --machine
 
 # SQL op with row limit
-hexlane op run my-app-db-prod/find-orders \
+hexlane op run my-app/find-orders \
   --param status=failed --limit 100
 
 # Debug credential acquisition and request details
-hexlane op run my-app-api-prod/get-account --param id=123 --debug
+hexlane op run my-app/get-account --param id=123 --debug
 ```
 
 **Options:**
 
-| Flag                | Description                                                  |
-| ------------------- | ------------------------------------------------------------ |
-| `--param key=value` | Parameter value — repeatable                                 |
-| `--target <id>`     | Run against a different target in the same integration       |
-| `--dry-run`         | Render templates and print plan, no execution                |
-| `--limit <n>`       | Max rows for SQL operations (default: 500)                   |
-| `--http-headers`    | Include response headers in output (http ops only)           |
-| `--machine`         | Output TOON (structured format for AI/scripting consumption) |
-| `--json`            | Output raw JSON                                              |
-| `--debug`           | Log credential state, SQL, and HTTP details to stderr        |
+| Flag                | Description                                                          |
+| ------------------- | -------------------------------------------------------------------- |
+| `--param key=value` | Parameter value — repeatable                                         |
+| `--target <id>`     | Run against a specific target (overrides `integration.defaultTarget`) |
+| `--dry-run`         | Render templates and print plan, no execution                        |
+| `--limit <n>`       | Max rows for SQL operations (default: 500)                           |
+| `--http-headers`    | Include response headers in output (http ops only)                   |
+| `--machine`         | Output TOON (structured format for AI/scripting consumption)         |
+| `--json`            | Output raw JSON                                                      |
+| `--debug`           | Log credential state, SQL, and HTTP details to stderr                |
 
 ---
 
@@ -87,72 +97,59 @@ Operations are stored in the integration YAML. `op add` appends one without edit
 
 If your API has an OpenAPI (Swagger) spec, share it with the model — it contains all the paths, methods, and parameters needed to define operations with perfect accuracy.
 
-### HTTP operation
+For integration operations (`--integration`), the full operation is supplied as raw YAML via `--raw` or `--file`. This gives precise control over every field and supports complex operations that don't fit individual flags:
 
 ```bash
-hexlane op add \
-  --integration <integration-id> \
-  --name <name> \
-  --tool http \
-  --method GET|POST|PUT|PATCH|DELETE \
-  --path "/resource/{{ paramName }}" \
-  --param "name:type:required_or_optional:description" \
-  --default-target <target-id> \
-  --description "What this operation does"
+# Inline YAML
+hexlane op add --integration github --raw "
+name: get-user
+tool: http
+description: Fetch a GitHub user profile
+parameters:
+  - name: username
+    type: string
+    required: true
+execution:
+  method: GET
+  path: /users/{{ username }}
+"
+
+# From a file
+hexlane op add --integration github --file ./get-user.yaml
+
+# From stdin
+cat get-user.yaml | hexlane op add --integration github --file -
 ```
 
-Path supports `{{ varName }}` template placeholders. Any parameter that appears in the path must be declared with `--param`.
+---
 
-**With a `query:` block** — query parameters are set in the YAML directly (see [integration-config.md](integration-config.md#http-operation)). When using `op add`, put optional query params as regular parameters; the query block can be added manually or via the YAML file later.
+## Editing operations with `op edit`
 
-**With a request body:**
+Replace an existing operation in-place. Supply the full updated YAML via `--raw` or `--file`:
 
 ```bash
-hexlane op add \
-  --integration my-app \
-  --name create-order \
-  --tool http \
-  --method POST \
-  --path "/orders" \
-  --body '{"type": "{{ orderType }}", "customerId": "{{ customerId }}"}' \
-  --param "orderType:string:required:Order type" \
-  --param "customerId:string:required:Customer ID" \
-  --default-target my-app-api-prod
+# Inline edit
+hexlane op edit github/get-user --raw "
+name: get-user
+tool: http
+description: Updated description
+parameters:
+  - name: username
+    type: string
+    required: true
+execution:
+  method: GET
+  path: /users/{{ username }}
+"
+
+# From a file
+hexlane op edit github/get-user --file ./get-user-updated.yaml
+
+# Round-trip via op show → edit
+hexlane op show github/get-user | hexlane op edit github/get-user --file -
 ```
 
-### SQL operation
-
-```bash
-hexlane op add \
-  --integration my-app \
-  --name find-order \
-  --tool sql \
-  --sql "SELECT id, created_at FROM orders WHERE status = :status" \
-  --param "status:string:required:Order status" \
-  --default-target my-app-db-prod
-```
-
-SQL uses `:name` placeholders — injection-safe, bound via parameterized queries. PostgreSQL `::type` cast syntax (e.g. `id::text`) does not conflict with `:name` params.
-
-### `--param` format
-
-```
-name:type:required_or_optional:description
-```
-
-| Segment     | Values                                             |
-| ----------- | -------------------------------------------------- |
-| `name`      | Alphanumeric + underscore, e.g. `orderId`          |
-| `type`      | `string` (default), `integer`, `number`, `boolean` |
-| third       | `required` (default) or `optional`                 |
-| description | Free text, may contain colons                      |
-
-Examples:
-```
-orderId:integer:required:Order primary key
-state:string:optional:Filter by state (open, closed, all)
-dryRun:boolean:optional:Preview only
-```
+The operation name in the YAML must match the `<op-name>` argument. The file is updated atomically — other operations are preserved.
 
 ---
 
@@ -195,7 +192,7 @@ query:
 ## Tips for AI models
 
 - Always run `hexlane op list --integration <id>` before reaching for `http call` or `sql query`
-- Check `op show <target-id>/<op-name>` to read param names, types, and defaults before running
+- Check `op show <integration-id>/<op-name>` to read param names, types, and defaults before running
 - Run with `--dry-run` first to confirm the rendered request
 - Use `--machine` when you need structured TOON output; the default is human-readable (pretty JSON for HTTP, table for SQL)
 

@@ -39,14 +39,20 @@ export const IntegrationTargetCredentialSchema = z.discriminatedUnion("kind", [
     DbConnectionCredentialSchema,
 ]);
 
+// ─── Target Tool ──────────────────────────────────────────────────────────────
+
+export const TargetToolSchema = z.object({
+    type: z.enum(["http", "sql", "fs"]),
+    config: z.record(z.string(), z.unknown()).default({}),
+    credential: IntegrationTargetCredentialSchema.optional(),
+});
+
 // ─── Target ───────────────────────────────────────────────────────────────────
 
 export const IntegrationTargetSchema = z.object({
     id: z.string().min(1).regex(/^[a-z0-9-]+$/, "Target ID must be lowercase alphanumeric with dashes"),
-    tool: z.enum(["http", "sql", "fs"]),
-    config: z.record(z.string(), z.unknown()).default({}),
     params: z.record(z.string(), z.string()).optional(),
-    credential: IntegrationTargetCredentialSchema.optional(),
+    tools: z.array(TargetToolSchema).min(1),
 });
 
 // ─── Integration Config ───────────────────────────────────────────────────────
@@ -56,6 +62,7 @@ export const IntegrationConfigSchema = z.object({
     integration: z.object({
         id: z.string().min(1).regex(/^[a-z0-9-]+$/, "Integration ID must be lowercase alphanumeric with dashes"),
         description: z.string().optional(),
+        defaultTarget: z.string().optional(),
         targets: z.array(IntegrationTargetSchema).min(1),
         operations: z.array(ToolOperationSchema).optional(),
     }),
@@ -63,6 +70,7 @@ export const IntegrationConfigSchema = z.object({
 
 export type IntegrationConfig = z.infer<typeof IntegrationConfigSchema>;
 export type IntegrationTarget = z.infer<typeof IntegrationTargetSchema>;
+export type TargetTool = z.infer<typeof TargetToolSchema>;
 export type IntegrationTargetCredential = z.infer<typeof IntegrationTargetCredentialSchema>;
 export type ApiTokenCredential = z.infer<typeof ApiTokenCredentialSchema>;
 export type DbConnectionCredential = z.infer<typeof DbConnectionCredentialSchema>;

@@ -380,8 +380,9 @@ function resolveTarget(targetId: string, opts?: { requireWritable?: boolean }): 
     const found = ctx.integrations.findByTargetId(targetId);
     if (!found) die(`Target "${targetId}" not found in any registered integration.`);
     const { target } = found!;
-    if (target.tool !== "fs") die(`Target "${targetId}" uses tool "${target.tool}", not "fs".`);
-    const cfg = validateFsConfig(target.config);
+    const fsTool = target.tools.find((t) => t.type === "fs");
+    if (!fsTool) die(`Target "${targetId}" has no fs tool configured.`);
+    const cfg = validateFsConfig(fsTool.config);
     if (opts?.requireWritable && cfg.readonly) {
         die(`Target "${targetId}" is read-only (config.readonly = true).`);
     }

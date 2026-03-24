@@ -73,8 +73,9 @@ export function registerCredentialCommands(program: Command): void {
                 const found = ctx.integrations.findByTargetId(opts.target);
                 if (!found) die(`Target "${opts.target}" not found in any registered integration.`);
                 const { integrationId, target } = found;
-                if (!target.credential) die(`Target "${opts.target}" has no credential configured.`);
-                const profileName = target.credential.kind;
+                const toolWithCred = target.tools.find((t) => t.credential && t.credential.kind !== "public");
+                if (!toolWithCred?.credential) die(`Target "${opts.target}" has no credential configured.`);
+                const profileName = toolWithCred.credential.kind;
                 const record = ctx.metadata.findByIdentity(integrationId, opts.target, profileName);
                 if (!record) {
                     die(`No credential found for target "${opts.target}" — it may not have been acquired yet.`);
@@ -111,9 +112,10 @@ export function registerCredentialCommands(program: Command): void {
                 const found = ctx.integrations.findByTargetId(opts.target);
                 if (!found) die(`Target "${opts.target}" not found in any registered integration.`);
                 const { integrationId, target } = found;
-                if (!target.credential) die(`Target "${opts.target}" has no credential configured.`);
+                const toolWithCred = target.tools.find((t) => t.credential && t.credential.kind !== "public");
+                if (!toolWithCred?.credential) die(`Target "${opts.target}" has no credential configured.`);
                 await ctx.vault.unlock();
-                await ctx.resolver.revoke(integrationId, opts.target, target.credential.kind);
+                await ctx.resolver.revoke(integrationId, opts.target, toolWithCred.credential.kind);
                 output({ message: `Credential revoked for target "${opts.target}"` });
             } catch (e: unknown) {
                 die((e as Error).message);
@@ -132,10 +134,11 @@ export function registerCredentialCommands(program: Command): void {
                 const found = ctx.integrations.findByTargetId(opts.target);
                 if (!found) die(`Target "${opts.target}" not found in any registered integration.`);
                 const { integrationId, target } = found;
-                if (!target.credential) die(`Target "${opts.target}" has no credential configured.`);
+                const toolWithCred = target.tools.find((t) => t.credential && t.credential.kind !== "public");
+                if (!toolWithCred?.credential) die(`Target "${opts.target}" has no credential configured.`);
                 await ctx.vault.unlock();
                 // Force expiry so resolver triggers renewal on next resolveForTarget call
-                const existing = ctx.metadata.findByIdentity(integrationId, opts.target, target.credential.kind);
+                const existing = ctx.metadata.findByIdentity(integrationId, opts.target, toolWithCred.credential.kind);
                 if (existing) {
                     ctx.metadata.updateAfterRenewal(
                         existing.id,
@@ -143,12 +146,12 @@ export function registerCredentialCommands(program: Command): void {
                         new Date().toISOString()
                     );
                 }
-                const record = await ctx.resolver.resolveForTarget(integrationId, opts.target, target.credential);
+                const record = await ctx.resolver.resolveForTarget(integrationId, opts.target, toolWithCred.credential);
                 output({
                     message: "Credential renewed",
                     integration: integrationId,
                     target: opts.target,
-                    kind: target.credential.kind,
+                    kind: toolWithCred.credential.kind,
                     expires_at: record?.expires_at ?? null,
                 });
             } catch (e: unknown) {
@@ -172,28 +175,30 @@ export function registerCredentialCommands(program: Command): void {
                 if (!found) die(`Target "${opts.target}" not found in any registered integration.`);
                 const { integrationId, target } = found;
 
-                if (!target.credential) {
+                const toolWithCred = target.tools.find((t) => t.credential && t.credential.kind !== "public");
+                if (!toolWithCred?.credential) {
                     die(`Target "${opts.target}" has no credential configured.`);
                     return;
                 }
-                if (target.credential.kind === "public") {
+                const targetCredential = toolWithCred.credential;
+                if (targetCredential.kind === "public") {
                     die(`Target "${opts.target}" is kind "public" — public targets need no credential.`);
                     return;
                 }
-                if (target.credential.acquire_strategy.kind !== "static") {
-                    die(`Target "${opts.target}" uses acquire_strategy "${target.credential.acquire_strategy.kind}", not "static". Only static targets require manual credential loading.`);
+                if (targetCredential.acquire_strategy.kind !== "static") {
+                    die(`Target "${opts.target}" uses acquire_strategy "${targetCredential.acquire_strategy.kind}", not "static". Only static targets require manual credential loading.`);
                     return;
                 }
 
                 await ctx.vault.unlock();
 
-                const profileName = target.credential.kind;
+                const profileName = targetCredential.kind;
                 const vaultRef = VaultManager.vaultRef(integrationId, opts.target, profileName);
                 const now = new Date();
-                const renewalTtl = target.credential.renewal_policy?.ttl;
+                const renewalTtl = targetCredential.renewal_policy?.ttl;
 
                 // ── Static DB connection string ──────────────────────────────────────
-                if (target.credential.kind === "db_connection") {
+                if (targetCredential.kind === "db_connection") {
                     if (!opts.connectionString) {
                         die("Provide --connection-string <url>, e.g. postgresql://user:pass@host:5432/dbname");
                     }

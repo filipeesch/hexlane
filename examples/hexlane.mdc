@@ -32,22 +32,28 @@ The `credential.kind` field on each target determines what's needed:
 If operations are defined for the integration, prefer `op run` over raw `http call` / `sql query`. Operations are named, typed, and validated — safer for agents.
 
 ```bash
-# List all operations — use --filter to search by name, description, or tag
+# List all operations — use --filter to search by name, description, tag, ref, or tool
 hexlane op list --filter <keyword>
 hexlane op list --integration <integration-id>
 hexlane op list --integration <integration-id> --filter <keyword>
 
-# Show full metadata, parameters, and examples for an operation
-hexlane op show github/get-user
+# Show the raw YAML of an operation (pipeable to op edit)
+hexlane op show <integration-id>/<op-name>
+
+# List targets compatible with an operation (✓ = integration.defaultTarget)
+hexlane op targets <integration-id>/<op-name>
 
 # Dry-run: render the execution template without hitting network or DB
-hexlane op run github/list-issues --param owner=torvalds --param repo=linux --dry-run
+hexlane op run <integration-id>/<op-name> --param owner=torvalds --param repo=linux --dry-run
 
 # Run an operation — use --machine for structured TOON output (recommended for AI consumption)
-hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=open --machine
+hexlane op run <integration-id>/<op-name> --param owner=torvalds --param repo=linux --param state=open --machine
+
+# Run against a specific target (overrides integration.defaultTarget)
+hexlane op run <integration-id>/<op-name> --target <target-id> --machine
 ```
 
-**Operation names are always target-qualified:** `<target-id>/<operation-name>` (e.g. `github/get-user`).
+**Operation ref format:** `<integration-id>/<operation-name>` (e.g. `github/get-user`).
 
 ---
 
@@ -60,32 +66,38 @@ Operations are named, typed, discoverable actions defined in integrations. They 
 ```bash
 hexlane op list                                         # all operations
 hexlane op list --integration <integration-id>          # filter by integration
-hexlane op list --filter <keyword>                      # search by name, description, or tag
+hexlane op list --filter <keyword>                      # search by name, description, tag, ref, or tool
 hexlane op list --integration <id> --filter <keyword>  # combine both
-hexlane op show <target-id>/<op>                        # full metadata + parameter table
-hexlane op validate <target-id>/<op>                    # schema + cross-reference validation
-hexlane op run <target-id>/<op> \                       # run the operation
+hexlane op show <integration-id>/<op>                        # raw YAML of the operation (pipeable)
+hexlane op targets <integration-id>/<op>                     # list compatible targets; ✓ = default
+hexlane op validate <integration-id>/<op>                    # schema + cross-reference validation
+hexlane op run <integration-id>/<op> \                       # run the operation
   --param name=value \                                 # repeatable, typed, validated
-  --target <target-id> \                               # override executing target (same integration)
+  --target <target-id> \                               # override integration.defaultTarget
   [--dry-run]                                          # render template only, no execution
   [--machine]                                          # TOON output — recommended for AI consumption
   [--json]                                             # raw JSON output
   [--debug] [--limit N]
 
-# Add an operation to a registered integration
-hexlane op add \
-  --integration <integration-id> \               # required
-  --name <name> \                                # required, lowercase alphanumeric-dashes
-  --tool http|sql \                              # required
-  --method GET|POST|PUT|PATCH|DELETE \           # required for http
-  --path "/resource/{{ paramName }}" \           # required for http; {{ var }} for templating
-  --body '{"key": "{{ paramName }}"}' \         # optional request body template (http only)
-  --sql "SELECT * FROM t WHERE id = :id" \       # required for sql; ::type casts are safe
-  --param "name:type:required:description" \     # repeatable; type: string|integer|number|boolean
-                                                 # third segment: "required" (default) or "optional"
-  --default-target <target-id> \                 # optional default target
-  --readonly \                                   # http only; sql defaults to true
-  --description "..."
+# Add an operation to a registered integration (full YAML — supports all fields)
+hexlane op add --integration <integration-id> --raw "
+name: get-user
+tool: http
+parameters:
+  - name: username
+    type: string
+    required: true
+execution:
+  method: GET
+  path: /users/{{ username }}
+"
+hexlane op add --integration <integration-id> --file ./get-user.yaml   # from file
+cat get-user.yaml | hexlane op add --integration <integration-id> --file -  # from stdin
+
+# Edit an existing operation in-place
+hexlane op edit <integration-id>/<op-name> --raw "..."      # inline YAML
+hexlane op edit <integration-id>/<op-name> --file ./op.yaml # from file
+hexlane op show <integration-id>/<op> | hexlane op edit <integration-id>/<op> --file -  # round-trip
 
 # Remove an operation from a registered integration
 hexlane op delete <integration-id>/<operation-name>
@@ -205,10 +217,11 @@ integration:
   id: my-project
   targets:
     - id: my-project-src
-      tool: fs
-      config:
-        root: ~/projects/my-project
-        readonly: false   # set true to block all writes
+      tools:
+        - type: fs
+          config:
+            root: ~/projects/my-project
+            readonly: false   # set true to block all writes
 ```
 
 ### `hexlane credential` — Inspect and manage cached credentials
@@ -248,15 +261,16 @@ integration:
   id: grafana
   targets:
     - id: grafana-staging
-      tool: http
-      config:
-        base_url: https://grafana.staging.example.com
       params:
         datasource_uid: ben9xq9lzod8gf   # injected automatically — no --param needed
-      credential:
-        kind: api_token
-        acquire_strategy:
-          kind: static
+      tools:
+        - type: http
+          config:
+            base_url: https://grafana.staging.example.com
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
 ```
 
 With this config, `hexlane op run grafana-staging/query-loki --param expr=... --param from=... --param to=...` works without specifying `datasource_uid` each time. For the operation to accept the injected value, declare the param as `required: false` in the operation's `parameters` list.
@@ -268,7 +282,7 @@ With this config, `hexlane op run grafana-staging/query-loki --param expr=... --
 
 1. **Discover integrations** — `hexlane integration list` + `hexlane integration show <id>` to find targets and credential types.
 2. **Discover operations** — `hexlane op list --filter <keyword>` to search by name, description, or tag; or `hexlane op list --integration <id>` to browse by integration. If an operation exists for your task, use it.
-3. **Before running an op** — `hexlane op show <target-id>/<op>` to read parameter names/types, then `--dry-run` to confirm the rendered execution before it fires.
+3. **Before running an op** — `hexlane op show <integration-id>/<op>` to read the raw YAML and understand parameters; `hexlane op targets <integration-id>/<op>` to see which targets are compatible and which is the default; then `--dry-run` to confirm the rendered execution before it fires.
 4. **Use `--param` for all variable values** — never interpolate values into `--sql` or paths.
 5. **Output** — Use `--machine` for all output that will be processed by a model (TOON format — structured, stable, easy to parse). Use `--json` when raw JSON is needed. The default format is human-readable (pretty JSON for HTTP, table for SQL).
 6. **Debug failures** — add `--debug` to trace credential state, SQL, and HTTP details. On 401, run `hexlane credential revoke --target <id>` and retry.

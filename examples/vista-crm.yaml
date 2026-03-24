@@ -1,0 +1,3483 @@
+version: 1
+integration:
+  id: vista-crm
+  description: >
+    Vistasoft REST API — one HTTP target per Vista broker_integration (see examples/vista-brokers-staging.json). Each
+    target base_url is https://{vistaBrokerId}-rest.vistahost.com.br. Operations are generated from OpenAPI embedded in
+    /doc/ on that host. Store API keys with: hexlane credential set --target <target-id> --token <params.key from BSP> —
+    never commit keys. Default broker for op run (no target prefix) is the first target in the list below (sorted by
+    target id). Use <target-id>/<op-name> or vista-crm/<op-name> --target <id> for other brokers.
+  targets:
+    - id: vista-belossa
+      tools:
+        - type: http
+          config:
+            base_url: https://belossai-rest.vistahost.com.br
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
+            auth:
+              kind: query_param
+              name: key
+    - id: vista-c10-imoveis
+      tools:
+        - type: http
+          config:
+            base_url: https://c10imove-rest.vistahost.com.br
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
+            auth:
+              kind: query_param
+              name: key
+    - id: vista-city-bh-imoveis
+      tools:
+        - type: http
+          config:
+            base_url: https://citybhim-rest.vistahost.com.br
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
+            auth:
+              kind: query_param
+              name: key
+    - id: vista-massote-brokers
+      tools:
+        - type: http
+          config:
+            base_url: https://cli40706-rest.vistahost.com.br
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
+            auth:
+              kind: query_param
+              name: key
+    - id: vista-posh-imoveis
+      tools:
+        - type: http
+          config:
+            base_url: https://poshimov-rest.vistahost.com.br
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
+            auth:
+              kind: query_param
+              name: key
+    - id: vista-smart-brokers
+      tools:
+        - type: http
+          config:
+            base_url: https://smartbro-rest.vistahost.com.br
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
+            auth:
+              kind: query_param
+              name: key
+    - id: vista-union-sp
+      tools:
+        - type: http
+          config:
+            base_url: https://unionsp3-rest.vistahost.com.br
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
+            auth:
+              kind: query_param
+              name: key
+    - id: vista-vivar-imoveis
+      tools:
+        - type: http
+          config:
+            base_url: https://vivar24164-rest.vistahost.com.br
+          credential:
+            kind: api_token
+            acquire_strategy:
+              kind: static
+            auth:
+              kind: query_param
+              name: key
+  operations:
+    - name: get-imoveis-buscaavancada
+      tool: http
+      description: Busca Avançada a dados de imóveis
+      tags:
+        - imoveis
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+      execution:
+        method: GET
+        path: /imoveis/buscaAvancada
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: get-imoveis-listar
+      tool: http
+      description: Listagem de imóveis da imobiliária que estão disponíveis
+      tags:
+        - imoveis
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: finalidade
+          type: string
+          required: true
+          description: venda, aluguel, não informe para pesquisar por ambos (array)
+        - name: showtotal
+          type: string
+          required: true
+          description: 1|0 Se deve mostrar os totais de páginas e resultados (string)
+        - name: v2
+          type: boolean
+          required: true
+          description: 1|0 (boolean)
+        - name: mobile_user
+          type: number
+          required: true
+          description: Usuário logado (number)
+        - name: imoveis
+          type: string
+          required: true
+          description: Parametro para buscar imóveis locais, da rede e fora da rede/ local,rede,foraDaRede (string)
+      execution:
+        method: GET
+        path: /imoveis/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          finalidade: '{{ finalidade }}'
+          showtotal: '{{ showtotal }}'
+          v2: '{{ v2 }}'
+          mobile_user: '{{ mobile_user }}'
+          imoveis: '{{ imoveis }}'
+    - name: get-clientes-listar
+      tool: http
+      description: Listagem de clientes da imobiliária que estão disponíveis
+      tags:
+        - clientes
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: showtotal
+          type: string
+          required: true
+          description: 1|0 Se deve mostrar os totais de páginas e resultados (string)
+      execution:
+        method: GET
+        path: /clientes/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+    - name: get-clientes-imoveisfavoritos
+      tool: http
+      description: Listagem imóveis favoritos de um cliente
+      tags:
+        - clientes
+      parameters:
+        - name: cliente
+          type: string
+          required: true
+          description: Código do cliente (string)
+      execution:
+        method: GET
+        path: /clientes/imoveisFavoritos
+        query:
+          cliente: '{{ cliente }}'
+    - name: get-clientes-detalhes
+      tool: http
+      description: Visualiza os dados de um cliente disponível
+      tags:
+        - clientes
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: is_ativo
+          type: string
+          required: true
+          description: Quando passado sim, retorno um campilado dos status configurados, dizendo se é ativo ou não (string)
+      execution:
+        method: GET
+        path: /clientes/detalhes
+        query:
+          pesquisa: '{{ pesquisa }}'
+          is_ativo: '{{ is_ativo }}'
+    - name: post-clientes-detalhes
+      tool: http
+      description: Inserir um novo cliente
+      tags:
+        - clientes
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os dados do cliente a ser cadastrado (string)
+      execution:
+        method: POST
+        path: /clientes/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-clientes-detalhes
+      tool: http
+      description: Atualiza os dados de um cliente
+      tags:
+        - clientes
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os dados do cliente a ser cadastrado (string/json)
+        - name: cliente
+          type: integer
+          required: true
+          description: Código do cliente a ser atualizado (integer)
+      execution:
+        method: PUT
+        path: /clientes/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+          cliente: '{{ cliente }}'
+    - name: get-imoveis-listarconteudo
+      tool: http
+      description: Retorna uma lista de conteúdos distintos de uma informação do imóvel
+      tags:
+        - imoveis
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: imoveis
+          type: string
+          required: true
+          description: >-
+            Parâmetro que irá definir a busca por dados de imóveis em rede ou não. Opções do parâmetro: rede|local
+            (string/json)
+      execution:
+        method: GET
+        path: /imoveis/listarConteudo
+        query:
+          pesquisa: '{{ pesquisa }}'
+          imoveis: '{{ imoveis }}'
+    - name: get-clientes-listarconteudo
+      tool: http
+      description: Retorna uma lista de conteúdos distintos de uma informação do cliente
+      tags:
+        - clientes
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+      execution:
+        method: GET
+        path: /clientes/listarConteudo
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: get-usuarios-listar
+      tool: http
+      description: Listar usuários ativos na imobiliária
+      tags:
+        - usuarios
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos de busca desejados; Campo paginação (json): 'paginacao':{'pagina':1,'quantidade':10}
+            (string/json)
+        - name: showtotal
+          type: boolean
+          required: true
+          description: Se deve mostrar os totais de páginas e resultados (boolean)
+      execution:
+        method: GET
+        path: /usuarios/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+    - name: get-imoveis-listarcampos
+      tool: http
+      description: Listagem dos campos disponíveis para integração com a API
+      tags:
+        - imoveis
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: 'Tipo de campo: imoveis | carac | infra | Agencia | Foto | Corretor | Prontuarios (string)'
+      execution:
+        method: GET
+        path: /imoveis/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-clientes-listarcampos
+      tool: http
+      description: Listagem dos campos disponíveis para integração com a API
+      tags:
+        - clientes
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: Filtrar por categoria de campos (string)
+      execution:
+        method: GET
+        path: /clientes/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-usuarios-listarcampos
+      tool: http
+      description: Listagem dos campos disponíveis para integração com a API
+      tags:
+        - usuarios
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: Filtrar por categoria de campos (string)
+      execution:
+        method: GET
+        path: /usuarios/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-chaveiros-listarcampos
+      tool: http
+      description: Listagem dos campos disponíveis para integração com a API
+      tags:
+        - chaveiros
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: Filtrar por categoria de campos (string)
+      execution:
+        method: GET
+        path: /chaveiros/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-retiradas-listarcampos
+      tool: http
+      description: Listagem dos campos disponíveis para integração com a API
+      tags:
+        - chaveiros
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: Filtrar por categoria de campos (string)
+      execution:
+        method: GET
+        path: /retiradas/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-agenda-listarcampos
+      tool: http
+      description: Lista os campos disponíveis para o método listar agenda
+      tags:
+        - agenda
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: Filtrar por categoria de campos (string)
+      execution:
+        method: GET
+        path: /agenda/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-agencias-listar
+      tool: http
+      description: Retorna uma lista de agências da imobiliária
+      tags:
+        - agencias
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+      execution:
+        method: GET
+        path: /agencias/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: get-agencias-listarcampos
+      tool: http
+      description: Listagem dos campos disponíveis para integração com a API
+      tags:
+        - agencias
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: Filtrar por categoria de campos (string)
+      execution:
+        method: GET
+        path: /agencias/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-propostas-listarcampos
+      tool: http
+      description: Listagem dos campos disponíveis para integração com a API
+      tags:
+        - propostas
+      execution:
+        method: GET
+        path: /propostas/listarcampos
+    - name: get-negociacoes-listarcampos
+      tool: http
+      description: Listagem dos campos disponíveis para integração com a API
+      tags:
+        - negociacoes
+      execution:
+        method: GET
+        path: /negociacoes/listarcampos
+    - name: get-imoveis-destaques
+      tool: http
+      description: Retorna a lista de imoveis em destaque da imobiliária
+      tags:
+        - imoveis
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: finalidade
+          type: string
+          required: true
+          description: venda ou aluguel, não informe para pesquisar por ambos (string)
+      execution:
+        method: GET
+        path: /imoveis/destaques
+        query:
+          pesquisa: '{{ pesquisa }}'
+          finalidade: '{{ finalidade }}'
+    - name: get-imoveis-finalidades
+      tool: http
+      description: 'Retorna as finalidades da imobiliária: Venda, Aluguel e/ou Temporada'
+      tags:
+        - imoveis
+      parameters:
+        - name: allStatus
+          type: string
+          required: true
+          description: Parâmetro que quando passado como true ele retorna a lista de status associada as finalidades (string/json)
+      execution:
+        method: GET
+        path: /imoveis/finalidades
+        query:
+          allStatus: '{{ allStatus }}'
+    - name: get-logotipo
+      tool: http
+      description: Retorna a URL do logotipo da empresa
+      tags:
+        - imobiliaria
+      execution:
+        method: GET
+        path: /logotipo
+    - name: get-siteurl
+      tool: http
+      description: Retorna a URL do site da imobiliária
+      tags:
+        - imobiliaria
+      execution:
+        method: GET
+        path: /siteurl
+    - name: get-emailauth
+      tool: http
+      description: Retorna credenciais de autenticação de e-mail
+      tags:
+        - imobiliaria
+      execution:
+        method: GET
+        path: /emailauth
+    - name: post-clientes-anexos
+      tool: http
+      description: Inserir um novo anexo no cadastro cliente
+      tags:
+        - clientes
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os dados do anexo a ser cadastrado (string)
+      execution:
+        method: POST
+        path: /clientes/anexos
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: get-imoveis-detalhes
+      tool: http
+      description: Visualiza os dados de um imóvel disponível
+      tags:
+        - imoveis
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: imovel
+          type: string
+          required: true
+          description: Código do imóvel (obrigatório na API; ausente no OpenAPI). (string)
+      execution:
+        method: GET
+        path: /imoveis/detalhes
+        query:
+          pesquisa: '{{ pesquisa }}'
+          imovel: '{{ imovel }}'
+    - name: post-imoveis-detalhes
+      tool: http
+      description: Inserir um novo cadastro de imovel
+      tags:
+        - imoveis
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os dados do imóvel a ser cadastrado obs:caso for enviado o parametro na URI 'office' para
+            atualizar, torna-se obrigatório ultilizar o CODIGO em cadastro[fields][Imovel] (string)
+        - name: office
+          type: integer
+          required: true
+          description: >-
+            Este parametro vai na URI, para que o Office possa atualizar o imóvel forçando o CODIGO mesmo que
+            configuração da imobiliária for PLACA (integer)
+      execution:
+        method: POST
+        path: /imoveis/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+          office: '{{ office }}'
+    - name: put-imoveis-detalhes
+      tool: http
+      description: Atualizar um cadastro de imovel
+      tags:
+        - imoveis
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os dados do imóvel a ser atualizado (string/json)
+        - name: imovel
+          type: integer
+          required: true
+          description: >-
+            Código do imóvel a ser atualizado obs:caso for enviado o parametro na URI 'office' torna-se obrigatório
+            ultilizar o CODIGO (integer)
+        - name: office
+          type: integer
+          required: true
+          description: >-
+            Este parametro vai na URI, para que o Office possa atualizar o imóvel forçando o CODIGO mesmo que
+            configuração da imobiliária for PLACA (integer)
+      execution:
+        method: PUT
+        path: /imoveis/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+          imovel: '{{ imovel }}'
+          office: '{{ office }}'
+    - name: delete-imoveis-detalhes
+      tool: http
+      description: Excluir um cadastro de imovel, seus corretores ou anexos
+      tags:
+        - imoveis
+      readOnly: false
+      parameters:
+        - name: delete_imovel
+          type: string
+          required: true
+          description: Confirmação se deve excluir o imóvel inteiro e seus dados associados (string)
+        - name: corretor
+          type: string
+          required: true
+          description: Remover um ou mais corretores (string/json)
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON para Foto ou Anexo (string/json)
+      execution:
+        method: DELETE
+        path: /imoveis/detalhes
+        query:
+          delete_imovel: '{{ delete_imovel }}'
+          corretor: '{{ corretor }}'
+          cadastro: '{{ cadastro }}'
+    - name: post-compartilhamento-email
+      tool: http
+      description: Dispara e-mail de compartilhamento de imóveis e registra históricos, parte do AppMobile
+      tags:
+        - compartilhamento
+      readOnly: false
+      parameters:
+        - name: data
+          type: string
+          required: true
+          description: >-
+            Dados do email:
+            {imoveis:{cod_imo:{Codigo:'',Moeda:'',ValorVendaPadrao:'',ValorLocacaoPadrao:'',ValorDiariaPadrao:''}},Cliente:[{Codigo:'',Nome:'',Email:''}],purpose:'',mensagem:''}
+            (string)
+        - name: mobile_user
+          type: string
+          required: true
+          description: Código do corretor logado (string)
+      execution:
+        method: POST
+        path: /compartilhamento/email
+        query:
+          data: '{{ data }}'
+          mobile_user: '{{ mobile_user }}'
+    - name: post-registrar-historico
+      tool: http
+      description: Registra histórico de atividades, parte do AppMobile
+      tags:
+        - atividades
+      readOnly: false
+      parameters:
+        - name: data
+          type: string
+          required: true
+          description: >-
+            Dados da atividade: {fields:{Cliente:'',Imovel:'',Corretor:'',Tipo:'',Assunto:'',Mensagem:'',Texto:''}}
+            (string)
+        - name: mobile_user
+          type: string
+          required: true
+          description: Código do corretor logado (string)
+      execution:
+        method: POST
+        path: /registrar/historico
+        query:
+          data: '{{ data }}'
+          mobile_user: '{{ mobile_user }}'
+    - name: post-imoveis-fotos
+      tool: http
+      description: Insere uma foto no imóvel
+      tags:
+        - fotos-de-imovel
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: string
+          required: true
+          description: Referência do imóvel (Codigo) (string)
+        - name: cadastro
+          type: string
+          required: true
+          description: Dados da foto a ser inserida (string)
+        - name: async
+          type: string
+          required: true
+          description: Utilize para processamento assíncrono (string)
+      execution:
+        method: POST
+        path: /imoveis/fotos
+        query:
+          imovel: '{{ imovel }}'
+          cadastro: '{{ cadastro }}'
+          async: '{{ async }}'
+    - name: put-imoveis-fotos
+      tool: http
+      description: Atualiza uma foto do imóvel
+      tags:
+        - fotos-de-imovel
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: string
+          required: true
+          description: Referência do imóvel (Codigo) (string)
+        - name: foto
+          type: integer
+          required: true
+          description: Código da foto do imóvel (ImagemCodigo) (integer)
+        - name: cadastro
+          type: string
+          required: true
+          description: Dados da foto a serem alterados (string/json)
+      execution:
+        method: PUT
+        path: /imoveis/fotos
+        query:
+          imovel: '{{ imovel }}'
+          foto: '{{ foto }}'
+          cadastro: '{{ cadastro }}'
+    - name: delete-imoveis-fotos
+      tool: http
+      description: Deleta uma foto do imóvel
+      tags:
+        - fotos-de-imovel
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: string
+          required: true
+          description: Referência do imóvel (Codigo) (string)
+        - name: foto
+          type: integer
+          required: true
+          description: Código da foto do imóvel (ImagemCodigo) (integer)
+      execution:
+        method: DELETE
+        path: /imoveis/fotos
+        query:
+          imovel: '{{ imovel }}'
+          foto: '{{ foto }}'
+    - name: put-imoveis-fotos-ordem
+      tool: http
+      description: Reordena todas as fotos de um imóvel
+      tags:
+        - fotos-de-imovel
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: string
+          required: true
+          description: Referência do imóvel (Codigo) (string)
+        - name: ordem
+          type: string
+          required: true
+          description: Códigos das fotos do imóvel na ordem desejada (ImagemCodigo) (list)
+      execution:
+        method: PUT
+        path: /imoveis/fotos/ordem
+        query:
+          imovel: '{{ imovel }}'
+          ordem: '{{ ordem }}'
+    - name: post-rdlead
+      tool: http
+      description: Inserção de Leads vindos do POST da RD Station
+      tags:
+        - integracoes
+      readOnly: false
+      execution:
+        method: POST
+        path: /rdlead
+    - name: post-login
+      tool: http
+      description: Valida um login de usuario
+      tags:
+        - leads
+      readOnly: false
+      parameters:
+        - name: email
+          type: string
+          required: true
+          description: E-mail do usuário (string)
+        - name: senha
+          type: string
+          required: true
+          description: Senha do usuário (string)
+        - name: mobile_details
+          type: string
+          required: true
+          description: Json contendo o identificador único e modelo do dispositivo (string)
+      execution:
+        method: POST
+        path: /login
+        query:
+          email: '{{ email }}'
+          senha: '{{ senha }}'
+          mobile_details: '{{ mobile_details }}'
+    - name: post-auth-login
+      tool: http
+      description: Valida um login de usuario
+      tags:
+        - leads
+      readOnly: false
+      parameters:
+        - name: email
+          type: string
+          required: true
+          description: E-mail do usuário (string/json)
+        - name: password
+          type: string
+          required: true
+          description: Senha do usuário (string/json)
+        - name: mobile_details
+          type: string
+          required: true
+          description: Json contendo o identificador único e modelo do dispositivo (string/json)
+      execution:
+        method: POST
+        path: /auth/login
+        query:
+          email: '{{ email }}'
+          password: '{{ password }}'
+          mobile_details: '{{ mobile_details }}'
+    - name: get-dispositivos-mobile-listar
+      tool: http
+      description: Lista os dispositivos que tentam usar o Vista Mobile
+      tags:
+        - leads
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+      execution:
+        method: GET
+        path: /dispositivos/mobile/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: put-dispositivos-mobile-update
+      tool: http
+      description: Atualiza o dispositivo para liberar, bloquear ou desativar o acesso ao vista mobile
+      tags:
+        - leads
+      readOnly: false
+      parameters:
+        - name: device
+          type: string
+          required: true
+          description: Identificador único do dispositivo (string)
+        - name: status
+          type: integer
+          required: true
+          description: Status do dispositivo 1(bloqueado) | 2(liberado) | 3(desativado) (integer)
+      execution:
+        method: PUT
+        path: /dispositivos/mobile/update
+        query:
+          device: '{{ device }}'
+          status: '{{ status }}'
+    - name: post-clientes-favoritarimovel
+      tool: http
+      description: Favorita o imóvel
+      tags:
+        - clientes
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: cliente
+          type: integer
+          required: true
+          description: Código do cliente (integer)
+      execution:
+        method: POST
+        path: /clientes/favoritarimovel
+        query:
+          imovel: '{{ imovel }}'
+          cliente: '{{ cliente }}'
+    - name: get-gooddata-clientes-ativos
+      tool: http
+      description: Integração com GoodData
+      tags:
+        - integracoes
+      execution:
+        method: GET
+        path: /gooddata/clientes/ativos
+    - name: get-proprietarios-feedback-info
+      tool: http
+      description: etorna o relatório de informações do imóvel do Proprietário
+      tags:
+        - proprietarios
+      parameters:
+        - name: imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: periodicidade
+          type: string
+          required: true
+          description: 'Periodo do relatório Valores aceitos: ''Mensal'' | ''Quinzenal'' | ''Semanal'' | Bimestral | Trimestral (string)'
+      execution:
+        method: GET
+        path: /proprietarios/feedback/info
+        query:
+          imovel: '{{ imovel }}'
+          periodicidade: '{{ periodicidade }}'
+    - name: get-proprietarios-listar
+      tool: http
+      description: Listar Proprietários
+      tags:
+        - proprietarios
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de anexos. Campos disponíveis ('fields'): 'Codigo', 'FotoCliente', 'Foto',
+            'CodigoAgencia', 'Corretor', 'Agencia', 'Nome', 'CPFCNPJ', 'CreditoSituacao', 'CreditoMensagem',
+            'CODIGO_CREDPAGO', 'PossuiAnexo', 'AnexoCodigoFinalidade', 'ContactScore', 'Relacionamentos', 'Anexos'
+            (string/json)
+      execution:
+        method: GET
+        path: /proprietarios/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: get-proprietarios-detalhes
+      tool: http
+      description: Consultar detalhes do proprietários
+      tags:
+        - proprietarios
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de anexos. Campos disponíveis ('fields'): 'Codigo', 'CodigoAgencia',
+            'Agencia', 'Nome', 'Foto' (string/json)
+      execution:
+        method: GET
+        path: /proprietarios/detalhes
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: post-proprietarios-inserir
+      tool: http
+      description: Cadastrar Proprietários
+      tags:
+        - proprietarios
+      readOnly: false
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de anexos. Campos disponíveis ('fields'): 'Codigo', 'CodigoAgencia',
+            'Agencia', 'Nome', 'Foto' (string)
+      execution:
+        method: POST
+        path: /proprietarios/inserir
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: put-proprietarios-atualizar
+      tool: http
+      description: Atualizar Proprietários
+      tags:
+        - proprietarios
+      readOnly: false
+      parameters:
+        - name: proprietario
+          type: string
+          required: true
+          description: Código do proprietário (string)
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os campos para cadastro de proprietários. (string/json)
+      execution:
+        method: PUT
+        path: /proprietarios/atualizar
+        query:
+          proprietario: '{{ proprietario }}'
+          cadastro: '{{ cadastro }}'
+    - name: get-imoveis-enderecos
+      tool: http
+      description: Busca de endereços
+      tags:
+        - imoveis
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: Filtro de busca (string/json)
+      execution:
+        method: GET
+        path: /imoveis/enderecos
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: post-lead
+      tool: http
+      description: Envio de leads por portais
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os dados do lead: { "lead": { "nome":"(campo obrigatório)", "email":"(campo tornasse obrigatório
+            caso não haja o CAMPO fone)", "fone":"(campo tornasse obrigatório caso não haja o CAMPO email)",
+            "interesse":"Venda", "anuncio":"(int)", "listingId":"", "corretor":"(int)", "veiculo":"(campo obrigatório)",
+            "mensagem":"(campo obrigatório)", "departamento":"", "foto":"", "agencia":"", "chat":{*}}} (string)
+      execution:
+        method: POST
+        path: /lead
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: get-orulo-remover
+      tool: http
+      description: Exclusão de imóveis de imobiliárias que encerram contrato com a Órulo
+      tags:
+        - integracoes
+      execution:
+        method: GET
+        path: /orulo/remover
+    - name: get-equipes-listar
+      tool: http
+      description: Pesquisa uma equipe
+      tags:
+        - usuarios
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: listLayout
+          type: string
+          required: true
+          description: Traz uma lista associada com codigo e nome, das equipes (string/json)
+      execution:
+        method: GET
+        path: /equipes/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          listLayout: '{{ listLayout }}'
+    - name: post-vivareal
+      tool: http
+      description: Integração com VivaReal
+      tags:
+        - integracoes
+      readOnly: false
+      execution:
+        method: POST
+        path: /vivareal
+    - name: post-imoveis-proposta
+      tool: http
+      description: Adição de proposta ou cancelamento de propostas e negociações
+      tags:
+        - propostas
+      readOnly: false
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string)
+        - name: showtotal
+          type: boolean
+          required: true
+          description: Se deve mostrar os totais de páginas e resultados (boolean)
+      execution:
+        method: POST
+        path: /imoveis/proposta
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+    - name: post-negocios-imoveis-proposta
+      tool: http
+      description: Adição de proposta ou cancelamento de propostas e negociações
+      tags:
+        - propostas
+      readOnly: false
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string)
+        - name: showtotal
+          type: boolean
+          required: true
+          description: Se deve mostrar os totais de páginas e resultados (boolean)
+      execution:
+        method: POST
+        path: /negocios/imoveis/proposta
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+    - name: post-imoveis-negociacao
+      tool: http
+      description: Adição de proposta ou cancelamento de propostas e negociações
+      tags:
+        - propostas
+      readOnly: false
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string)
+        - name: showtotal
+          type: boolean
+          required: true
+          description: Se deve mostrar os totais de páginas e resultados (boolean)
+      execution:
+        method: POST
+        path: /imoveis/negociacao
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+    - name: get-clientes-perfil-listarcampos
+      tool: http
+      description: Lista campos de perfil do cliente
+      tags:
+        - clientes
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: Filtrar por categoria de campos (string)
+      execution:
+        method: GET
+        path: /clientes/perfil/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-clientes-perfil
+      tool: http
+      description: Listar perfis do cliente
+      tags:
+        - clientes
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: Campos de pesquisa (string/json)
+        - name: cliente
+          type: string
+          required: true
+          description: Codigo do cliente (string)
+      execution:
+        method: GET
+        path: /clientes/perfil
+        query:
+          pesquisa: '{{ pesquisa }}'
+          cliente: '{{ cliente }}'
+    - name: post-clientes-perfil
+      tool: http
+      description: Inserir perfil do cliente
+      tags:
+        - clientes
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: Campos de pesquisa (string)
+        - name: cliente
+          type: string
+          required: true
+          description: Codigo do cliente (string)
+        - name: finalidade
+          type: string
+          required: true
+          description: Pode utilizar "Locação" caso a imobiliária possua layout de perfil diferente para locação (string)
+      execution:
+        method: POST
+        path: /clientes/perfil
+        query:
+          cadastro: '{{ cadastro }}'
+          cliente: '{{ cliente }}'
+          finalidade: '{{ finalidade }}'
+    - name: get-chaveiros-listar
+      tool: http
+      description: Pesquisar chaveiros
+      tags:
+        - chaveiros
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: showtotal
+          type: boolean
+          required: true
+          description: Se deve mostrar os totais de páginas e resultados (boolean)
+      execution:
+        method: GET
+        path: /chaveiros/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+    - name: get-retiradas-listar
+      tool: http
+      description: Pesquisar retirada de chaves
+      tags:
+        - chaveiros
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para filtrar a retirada. Campos disponíveis ('filter'): 'CodigoNegocio', 'Imovel',
+            'Cliente', 'RegistradoPor', 'CorretorResponsavel', 'CodigoChaveiro', 'Situacao', 'RetiradasFinalizadas',
+            'Departamento', 'DataRetirada', 'DataRetorno'; Campo paginação (json):
+            'paginacao':{'pagina':1,'quantidade':10} (string/json)
+        - name: showtotal
+          type: boolean
+          required: true
+          description: Se deve mostrar os totais de páginas e resultados (boolean)
+        - name: v2
+          type: integer
+          required: true
+          description: (integer)
+      execution:
+        method: GET
+        path: /retiradas/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+          v2: '{{ v2 }}'
+    - name: get-retiradas-detalhes
+      tool: http
+      description: Detalhes da retirada de chaves
+      tags:
+        - chaveiros
+      parameters:
+        - name: retirada
+          type: integer
+          required: true
+          description: Código da Retirada (integer)
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Código do Negócio (integer)
+      execution:
+        method: GET
+        path: /retiradas/detalhes
+        query:
+          retirada: '{{ retirada }}'
+          codigo_negocio: '{{ codigo_negocio }}'
+    - name: post-retiradas-detalhes
+      tool: http
+      description: Insere uma retirada de chaves
+      tags:
+        - chaveiros
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para cadastro. Campos disponíveis ('fields'): 'RegistradoPor', 'CorretorResponsavel',
+            'Cliente', 'Chaveiros', 'Negocio' (string)
+      execution:
+        method: POST
+        path: /retiradas/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: delete-retiradas-detalhes
+      tool: http
+      description: Remove uma retirada de chaves
+      tags:
+        - chaveiros
+      readOnly: false
+      parameters:
+        - name: retirada
+          type: integer
+          required: true
+          description: Código da retirada (integer)
+        - name: codigo_negocio
+          type: string
+          required: true
+          description: Codigo do negócio (string)
+      execution:
+        method: DELETE
+        path: /retiradas/detalhes
+        query:
+          retirada: '{{ retirada }}'
+          codigo_negocio: '{{ codigo_negocio }}'
+    - name: post-retiradas-devolver
+      tool: http
+      description: Registra uma devolução de chaveiros
+      tags:
+        - chaveiros
+      readOnly: false
+      parameters:
+        - name: retirada
+          type: integer
+          required: true
+          description: Código da retirada (integer)
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os dados da retirada:
+            {"fields":{"retirada":(int),"FeedBackVisita":"","imoveis":[{"imovel":(int),"FeedBackVisita":""},...]}
+            (string)
+      execution:
+        method: POST
+        path: /retiradas/devolver
+        query:
+          retirada: '{{ retirada }}'
+          cadastro: '{{ cadastro }}'
+    - name: get-agenda-listar
+      tool: http
+      description: Lista as agendas de imóveis
+      tags:
+        - agenda
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: showtotal
+          type: string
+          required: true
+          description: 1|0 Se deve mostrar os totais de páginas e resultados (string)
+      execution:
+        method: GET
+        path: /agenda/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+    - name: get-agenda-buscar
+      tool: http
+      description: Pesquisa agendas de imóveis
+      tags:
+        - agenda
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: showtotal
+          type: string
+          required: true
+          description: 1|0 Se deve mostrar os totais de páginas e resultados (string)
+        - name: acao
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: GET
+        path: /agenda/buscar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+          acao: '{{ acao }}'
+    - name: get-agenda-tarefas-listar
+      tool: http
+      description: Pesquisa tarefas da agenda
+      tags:
+        - agenda
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: showtotal
+          type: string
+          required: true
+          description: 1|0 Se deve mostrar os totais de páginas e resultados (string)
+      execution:
+        method: GET
+        path: /agenda/tarefas/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          showtotal: '{{ showtotal }}'
+    - name: post-feedback-visita
+      tool: http
+      description: Cria um registro do feedback da visita
+      tags:
+        - feedback-de-visita
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para cadastrar o Feedback de Visita. Campos disponíveis ('fields'): 'CodigoVisita',
+            'CodigoCorretor', 'CodigoImovel', 'CodigoCliente', 'DataHoraVisita', 'Nota', 'Comentario',
+            'FeedbackLocalizacao', 'FeedbackPreco', 'FeedbackConservacao' (string)
+      execution:
+        method: POST
+        path: /feedback/visita
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: get-agenda-dias
+      tool: http
+      description: Lista os dias em que um imóvel está agendado para visitas
+      tags:
+        - agenda
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (filtros e ordenação) (string/json)
+      execution:
+        method: GET
+        path: /agenda/dias
+        query:
+          pesquisa: '{{ pesquisa }}'
+    - name: get-agenda-detalhes
+      tool: http
+      description: Busca determinado agendamento
+      tags:
+        - agenda
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código do agendamento (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+      execution:
+        method: GET
+        path: /agenda/detalhes
+        query:
+          codigo: '{{ codigo }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: post-agenda-detalhes
+      tool: http
+      description: Insere agendamentos em imóveis
+      tags:
+        - agenda
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os dados do agendamento (string)
+      execution:
+        method: POST
+        path: /agenda/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-agenda-detalhes
+      tool: http
+      description: Edição de agendamentos
+      tags:
+        - agenda
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código do agendamento que deseja editar (integer)
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: showtotal
+          type: string
+          required: true
+          description: 1|0 Se deve mostrar os totais de páginas e resultados (string)
+      execution:
+        method: PUT
+        path: /agenda/detalhes
+        query:
+          codigo: '{{ codigo }}'
+          cadastro: '{{ cadastro }}'
+          showtotal: '{{ showtotal }}'
+    - name: delete-agenda-detalhes
+      tool: http
+      description: Deleta um agendamento
+      tags:
+        - agenda
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código do agendamento que deseja deletar (integer)
+      execution:
+        method: DELETE
+        path: /agenda/detalhes
+        query:
+          codigo: '{{ codigo }}'
+    - name: post-agenda-details
+      tool: http
+      description: Insere agendamentos em imóveis
+      tags:
+        - agenda
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string)
+      execution:
+        method: POST
+        path: /agenda/details
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-agenda-details
+      tool: http
+      description: Edição de agendamentos
+      tags:
+        - agenda
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código do agendamento desejado (integer)
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os dados do agendamento (string/json)
+        - name: etapa
+          type: string
+          required: true
+          description: (string)
+        - name: origem_cancelamento
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: PUT
+        path: /agenda/details
+        query:
+          codigo: '{{ codigo }}'
+          cadastro: '{{ cadastro }}'
+          etapa: '{{ etapa }}'
+          origem_cancelamento: '{{ origem_cancelamento }}'
+    - name: put-agenda-cancelar
+      tool: http
+      description: Cancela um agendamento
+      tags:
+        - agenda
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Número do agendamento (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: Código do corretor (integer)
+      execution:
+        method: PUT
+        path: /agenda/cancelar
+        query:
+          codigo: '{{ codigo }}'
+          corretor: '{{ corretor }}'
+    - name: put-agenda-cancel
+      tool: http
+      description: Cancela uma visita
+      tags:
+        - agenda
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Número da atividade (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: Código do corretor (integer)
+        - name: codigo_em
+          type: integer
+          required: true
+          description: Código da imobiliária (integer)
+      execution:
+        method: PUT
+        path: /agenda/cancel
+        query:
+          codigo: '{{ codigo }}'
+          corretor: '{{ corretor }}'
+          codigo_em: '{{ codigo_em }}'
+    - name: put-agenda-cancelarpap
+      tool: http
+      description: Cancela uma negociação de locação na CredPago
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Número da atividade (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: Código do corretor (integer)
+      execution:
+        method: PUT
+        path: /agenda/cancelar_pap
+        query:
+          codigo: '{{ codigo }}'
+          corretor: '{{ corretor }}'
+    - name: post-lead-site
+      tool: http
+      description: Cadastro de leads pelos widgets de integração com o site da imobiliária
+      tags:
+        - widgets-do-site
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os dados do lead (string)
+      execution:
+        method: POST
+        path: /lead/site
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: get-credito-simular
+      tool: http
+      description: Realiza simulação de locação na CredPago
+      tags:
+        - integracoes
+      parameters:
+        - name: cliente
+          type: integer
+          required: true
+          description: Código do cliente (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: Código do corretor (integer)
+        - name: limite
+          type: number
+          required: true
+          description: Limite do cartão do cliente (number)
+        - name: tipo_imovel
+          type: string
+          required: true
+          description: Residencial|Comercial|Universitário Tipo de imóvel (string)
+        - name: nome_estudante
+          type: string
+          required: true
+          description: Nome do estudante quando o imóvel for do tipo universitário (string)
+      execution:
+        method: GET
+        path: /credito/simular
+        query:
+          cliente: '{{ cliente }}'
+          corretor: '{{ corretor }}'
+          limite: '{{ limite }}'
+          tipo_imovel: '{{ tipo_imovel }}'
+          nome_estudante: '{{ nome_estudante }}'
+    - name: post-credito-simular
+      tool: http
+      description: Realiza simulação de locação na CredPago
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: cliente
+          type: integer
+          required: true
+          description: Código do cliente (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: Código do corretor (integer)
+        - name: limite
+          type: number
+          required: true
+          description: Limite do cartão do cliente (number)
+        - name: tipo_imovel
+          type: string
+          required: true
+          description: Residencial|Comercial|Universitário Tipo de imóvel (string)
+        - name: nome_estudante
+          type: string
+          required: true
+          description: Nome do estudante quando o imóvel for do tipo universitário (string)
+      execution:
+        method: POST
+        path: /credito/simular
+        query:
+          cliente: '{{ cliente }}'
+          corretor: '{{ corretor }}'
+          limite: '{{ limite }}'
+          tipo_imovel: '{{ tipo_imovel }}'
+          nome_estudante: '{{ nome_estudante }}'
+    - name: get-credito-analise
+      tool: http
+      description: Cancela uma negociação de locação na CredPago
+      tags:
+        - integracoes
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Número da atividade (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: Código do corretor (integer)
+      execution:
+        method: GET
+        path: /credito/analise
+        query:
+          codigo: '{{ codigo }}'
+          corretor: '{{ corretor }}'
+    - name: post-credito-analise
+      tool: http
+      description: Cancela uma negociação de locação na CredPago
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Número da atividade (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: Código do corretor (integer)
+      execution:
+        method: POST
+        path: /credito/analise
+        query:
+          codigo: '{{ codigo }}'
+          corretor: '{{ corretor }}'
+    - name: get-credito-verificaraprovacao
+      tool: http
+      description: Solicita a aprovação da locação na CredPago
+      tags:
+        - integracoes
+      parameters:
+        - name: imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: inquilino
+          type: integer
+          required: true
+          description: Código do inquilino (integer)
+        - name: familiar
+          type: integer
+          required: true
+          description: Código do familiar (para universitário menor de idade) (integer)
+        - name: corresponsavel
+          type: integer
+          required: true
+          description: Código do responsável (opcional) (integer)
+        - name: visita
+          type: integer
+          required: true
+          description: Código da visita (integer)
+        - name: tipo_imovel
+          type: string
+          required: true
+          description: Residencial|Comercial|Universitário Tipo de imóvel (string)
+      execution:
+        method: GET
+        path: /credito/verificar_aprovacao
+        query:
+          imovel: '{{ imovel }}'
+          inquilino: '{{ inquilino }}'
+          familiar: '{{ familiar }}'
+          corresponsavel: '{{ corresponsavel }}'
+          visita: '{{ visita }}'
+          tipo_imovel: '{{ tipo_imovel }}'
+    - name: post-credpago-imobiliaria
+      tool: http
+      description: Webhook de atualização do status da imobiliária na CredPago
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: cdastro
+          type: string
+          required: true
+          description: Dados da Imobiliária (string)
+      execution:
+        method: POST
+        path: /credpago/imobiliaria
+        query:
+          cdastro: '{{ cdastro }}'
+    - name: post-credpago-pagamento
+      tool: http
+      description: Webhook de atualização do status de pagamento do lead
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: evento
+          type: string
+          required: true
+          description: (string)
+        - name: id_pessoa
+          type: string
+          required: true
+          description: (string)
+        - name: status
+          type: string
+          required: true
+          description: (string)
+        - name: mensagem
+          type: string
+          required: true
+          description: (string)
+        - name: codigo_externo
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: POST
+        path: /credpago/pagamento
+        query:
+          evento: '{{ evento }}'
+          id_pessoa: '{{ id_pessoa }}'
+          status: '{{ status }}'
+          mensagem: '{{ mensagem }}'
+          codigo_externo: '{{ codigo_externo }}'
+    - name: post-credpago-imovel
+      tool: http
+      description: Webhook para atualizar o status da avaliação do imóvel
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: evento
+          type: string
+          required: true
+          description: (string)
+        - name: id_imovel
+          type: string
+          required: true
+          description: (string)
+        - name: status
+          type: string
+          required: true
+          description: (string)
+        - name: mensagem
+          type: string
+          required: true
+          description: (string)
+        - name: codigo_externo
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: POST
+        path: /credpago/imovel
+        query:
+          evento: '{{ evento }}'
+          id_imovel: '{{ id_imovel }}'
+          status: '{{ status }}'
+          mensagem: '{{ mensagem }}'
+          codigo_externo: '{{ codigo_externo }}'
+    - name: post-credpago-pessoa
+      tool: http
+      description: Webhook para atualizar o status da análise de crédito do lead
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: evento
+          type: string
+          required: true
+          description: (string)
+        - name: id_pessoa
+          type: string
+          required: true
+          description: (string)
+        - name: status
+          type: string
+          required: true
+          description: (string)
+        - name: mensagem
+          type: string
+          required: true
+          description: (string)
+        - name: codigo_externo
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: POST
+        path: /credpago/pessoa
+        query:
+          evento: '{{ evento }}'
+          id_pessoa: '{{ id_pessoa }}'
+          status: '{{ status }}'
+          mensagem: '{{ mensagem }}'
+          codigo_externo: '{{ codigo_externo }}'
+    - name: get-seguro-cotar
+      tool: http
+      description: Estimativa de custo de seguro
+      tags:
+        - integracoes
+      parameters:
+        - name: categoria
+          type: string
+          required: true
+          description: (string)
+        - name: imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: numero_parcelas
+          type: integer
+          required: true
+          description: (integer)
+        - name: tipo_empresa
+          type: string
+          required: true
+          description: servico|deposito|fabrica|comercio|escritorio_consultorio Tipo da empresa (string)
+      execution:
+        method: GET
+        path: /seguro/cotar
+        query:
+          categoria: '{{ categoria }}'
+          imovel: '{{ imovel }}'
+          numero_parcelas: '{{ numero_parcelas }}'
+          tipo_empresa: '{{ tipo_empresa }}'
+    - name: post-seguro-contratar
+      tool: http
+      description: Contratação de seguro
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: categoria
+          type: string
+          required: true
+          description: (string)
+        - name: construcao
+          type: string
+          required: true
+          description: (string)
+        - name: valor_imovel
+          type: number
+          required: true
+          description: (number)
+        - name: numero_parcelas
+          type: integer
+          required: true
+          description: (integer)
+        - name: inquilino
+          type: integer
+          required: true
+          description: (integer)
+        - name: imovel
+          type: integer
+          required: true
+          description: (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: (integer)
+      execution:
+        method: POST
+        path: /seguro/contratar
+        query:
+          categoria: '{{ categoria }}'
+          construcao: '{{ construcao }}'
+          valor_imovel: '{{ valor_imovel }}'
+          numero_parcelas: '{{ numero_parcelas }}'
+          inquilino: '{{ inquilino }}'
+          imovel: '{{ imovel }}'
+          corretor: '{{ corretor }}'
+    - name: post-seguro-cadastro
+      tool: http
+      description: Cadastro de imobiliaria
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: categoria
+          type: string
+          required: true
+          description: (string)
+        - name: construcao
+          type: string
+          required: true
+          description: (string)
+        - name: valor_imovel
+          type: number
+          required: true
+          description: (number)
+        - name: numero_parcelas
+          type: integer
+          required: true
+          description: (integer)
+        - name: inquilino
+          type: integer
+          required: true
+          description: (integer)
+        - name: imovel
+          type: integer
+          required: true
+          description: (integer)
+        - name: corretor
+          type: integer
+          required: true
+          description: (integer)
+      execution:
+        method: POST
+        path: /seguro/cadastro
+        query:
+          categoria: '{{ categoria }}'
+          construcao: '{{ construcao }}'
+          valor_imovel: '{{ valor_imovel }}'
+          numero_parcelas: '{{ numero_parcelas }}'
+          inquilino: '{{ inquilino }}'
+          imovel: '{{ imovel }}'
+          corretor: '{{ corretor }}'
+    - name: post-seguro-cancelar
+      tool: http
+      description: Cancelar Contrato.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: chave_acesso
+          type: string
+          required: true
+          description: Chave de acesso da empresa (string)
+        - name: codigo_imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: user_cancel
+          type: string
+          required: true
+          description: Nome de usuário do sistema da Corretora ou Parceiro (string)
+        - name: ID
+          type: integer
+          required: true
+          description: Código da Contratação (integer)
+        - name: id_Corretora
+          type: integer
+          required: true
+          description: Código da Corretora, para corretora MIGRA informar '1' (integer)
+      execution:
+        method: POST
+        path: /seguro/cancelar
+        query:
+          chave_acesso: '{{ chave_acesso }}'
+          codigo_imovel: '{{ codigo_imovel }}'
+          user_cancel: '{{ user_cancel }}'
+          ID: '{{ ID }}'
+          id_Corretora: '{{ id_Corretora }}'
+    - name: get-agenda-imovel
+      tool: http
+      description: Horários disponíveis para agendamento de visita
+      tags:
+        - agenda
+      parameters:
+        - name: imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: dia
+          type: string
+          required: true
+          description: Dia da visita no formato aaaa-mm-dd (date)
+      execution:
+        method: GET
+        path: /agenda/imovel
+        query:
+          imovel: '{{ imovel }}'
+          dia: '{{ dia }}'
+    - name: get-pontaaponta-privacidadeagendamentolistar
+      tool: http
+      description: Retorna os termos de privacidade e email marketing definidos na CNFGSYS
+      tags:
+        - widgets-do-site
+      execution:
+        method: GET
+        path: /ponta_a_ponta/privacidade_agendamento_listar
+    - name: get-agenda-carregarintervalos
+      tool: http
+      description: Horários disponíveis para agendamento de visita
+      tags:
+        - widgets-do-site
+      parameters:
+        - name: imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: intervalo
+          type: integer
+          required: true
+          description: Quantidade de dias para verificar (integer)
+      execution:
+        method: GET
+        path: /agenda/carregar_intervalos
+        query:
+          imovel: '{{ imovel }}'
+          intervalo: '{{ intervalo }}'
+    - name: delete-clientes-removerelacionamento
+      tool: http
+      description: Remove relacionamento entre clientes (parente, fiador...)
+      tags:
+        - clientes
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código do relacionamento (integer)
+        - name: cliente
+          type: integer
+          required: true
+          description: Código do cliente (integer)
+      execution:
+        method: DELETE
+        path: /clientes/remove_relacionamento
+        query:
+          codigo: '{{ codigo }}'
+          cliente: '{{ cliente }}'
+    - name: get-corretores-subordinados
+      tool: http
+      description: Lista os corretores subordinados do usuário logado
+      tags:
+        - corretores
+      parameters:
+        - name: mobile_user
+          type: string
+          required: true
+          description: Código do usuário logado (string/json)
+      execution:
+        method: GET
+        path: /corretores/subordinados
+        query:
+          mobile_user: '{{ mobile_user }}'
+    - name: get-corretores-tipos
+      tool: http
+      description: Lista todos os tipos de corretores da base
+      tags:
+        - corretores
+      execution:
+        method: GET
+        path: /corretores/tipos
+    - name: get-corretores-listar
+      tool: http
+      description: Lista todos os  corretores da base
+      tags:
+        - corretores
+      parameters:
+        - name: page
+          type: string
+          required: true
+          description: Página da listagem de corretores (string/json)
+        - name: limit
+          type: string
+          required: true
+          description: Quantidade de itens por página da listagem de corretores (string/json)
+      execution:
+        method: GET
+        path: /corretores/listar
+        query:
+          page: '{{ page }}'
+          limit: '{{ limit }}'
+    - name: post-office-registrarcontrato
+      tool: http
+      description: Atualiza informações no CRM após o registro de um contrato
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: cliente
+          type: integer
+          required: true
+          description: Código do cliente (integer)
+        - name: imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: contrato
+          type: integer
+          required: true
+          description: Código do contrato (integer)
+        - name: finalidade
+          type: string
+          required: true
+          description: venda|locacao (string)
+        - name: alterarImovelStatus
+          type: boolean
+          required: true
+          description: flag que permite ou nao alteracao do status do imovel (boolean)
+      execution:
+        method: POST
+        path: /office/registrar_contrato
+        query:
+          cliente: '{{ cliente }}'
+          imovel: '{{ imovel }}'
+          contrato: '{{ contrato }}'
+          finalidade: '{{ finalidade }}'
+          alterarImovelStatus: '{{ alterarImovelStatus }}'
+    - name: post-office-desativarcontrato
+      tool: http
+      description: Atualiza informações de imóvel no CRM após desativar um contrato
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: contrato
+          type: integer
+          required: true
+          description: Código do contrato (integer)
+        - name: status
+          type: string
+          required: true
+          description: Venda|Aluguel|Venda e Aluguel (string)
+      execution:
+        method: POST
+        path: /office/desativar_contrato
+        query:
+          imovel: '{{ imovel }}'
+          contrato: '{{ contrato }}'
+          status: '{{ status }}'
+    - name: get-imovel-foto-url-async-check
+      tool: http
+      description: Validação de adição de foto no imóvel em modo assíncrono
+      tags:
+        - fotos-de-imovel
+      parameters:
+        - name: uuid
+          type: string
+          required: true
+          description: Ticket para validação de adição de foto no imóvel (string)
+      execution:
+        method: GET
+        path: /imovel-foto-url/async/check
+        query:
+          uuid: '{{ uuid }}'
+    - name: put-imovel-foto-url-s3-async-callback
+      tool: http
+      description: Callback de upload de fotos de imóveis de modo assíncrono para S3
+      tags:
+        - fotos-de-imovel
+      readOnly: false
+      parameters:
+        - name: uuid
+          type: string
+          required: true
+          description: ticket (string)
+        - name: status
+          type: string
+          required: true
+          description: status (string)
+        - name: setup
+          type: string
+          required: true
+          description: setup (string)
+        - name: message
+          type: string
+          required: true
+          description: message (string)
+        - name: obs
+          type: string
+          required: true
+          description: obs (string)
+      execution:
+        method: PUT
+        path: /imovel-foto-url-s3/async/callback
+        query:
+          uuid: '{{ uuid }}'
+          status: '{{ status }}'
+          setup: '{{ setup }}'
+          message: '{{ message }}'
+          obs: '{{ obs }}'
+    - name: get-contasproprietario-listarcampos
+      tool: http
+      description: Lista os campos para uso nas contas de proprietário
+      tags:
+        - proprietarios
+      execution:
+        method: GET
+        path: /contas_proprietario/listarcampos
+    - name: get-contasproprietario-listar
+      tool: http
+      description: Busca as contas de proprietários
+      tags:
+        - proprietarios
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: 'JSON com os campos da busca: {"fields":{*},"filter":{*},"paginacao":{*}} (string/json)'
+        - name: proprietario
+          type: integer
+          required: true
+          description: Código do proprietário (CodigoProprietario) (integer)
+      execution:
+        method: GET
+        path: /contas_proprietario/listar
+        query:
+          pesquisa: '{{ pesquisa }}'
+          proprietario: '{{ proprietario }}'
+    - name: get-contasproprietario-detalhes
+      tool: http
+      description: Detalhes da conta de proprietário
+      tags:
+        - proprietarios
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: 'JSON com os campos da conta: {"fields":{*}} (string/json)'
+        - name: codigo
+          type: integer
+          required: true
+          description: Código da conta do proprietário (Codigo) (integer)
+        - name: proprietario
+          type: integer
+          required: true
+          description: Código do proprietário (CodigoProprietario) (integer)
+      execution:
+        method: GET
+        path: /contas_proprietario/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+          codigo: '{{ codigo }}'
+          proprietario: '{{ proprietario }}'
+    - name: post-contasproprietario-detalhes
+      tool: http
+      description: Insere uma conta de proprietário
+      tags:
+        - proprietarios
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: 'JSON com os dados da conta: {"fields":{*}} (string)'
+      execution:
+        method: POST
+        path: /contas_proprietario/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-contasproprietario-detalhes
+      tool: http
+      description: Atualiza uma conta de proprietário
+      tags:
+        - proprietarios
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: 'JSON com os dados da conta: {"fields":{*}} (string/json)'
+        - name: codigo
+          type: integer
+          required: true
+          description: Código da conta do proprietário (Codigo) (integer)
+      execution:
+        method: PUT
+        path: /contas_proprietario/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+          codigo: '{{ codigo }}'
+    - name: delete-contasproprietario-detalhes
+      tool: http
+      description: Exclui uma conta de proprietário
+      tags:
+        - proprietarios
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código da conta do proprietário (Codigo) (integer)
+        - name: proprietario
+          type: integer
+          required: true
+          description: Código do proprietário (CodigoProprietario) (integer)
+      execution:
+        method: DELETE
+        path: /contas_proprietario/detalhes
+        query:
+          codigo: '{{ codigo }}'
+          proprietario: '{{ proprietario }}'
+    - name: post-imoveis-link
+      tool: http
+      description: Gera o link de compartilhamento de um imóvel
+      tags:
+        - imoveis
+      readOnly: false
+      parameters:
+        - name: codigo_usuario
+          type: integer
+          required: true
+          description: Código do usuário (integer)
+        - name: encurtar
+          type: boolean
+          required: true
+          description: Se deve gerar uma URL encurtada (boolean)
+        - name: imoveis
+          type: string
+          required: true
+          description: Array com códigos de imóveis (Array de objetos) (array)
+        - name: parametros_extra
+          type: string
+          required: true
+          description: Parâmetros que sobreescrevem regras aplicadas dinâmicamente em algumas ocasiões (string)
+      execution:
+        method: POST
+        path: /imoveis/link
+        query:
+          codigo_usuario: '{{ codigo_usuario }}'
+          encurtar: '{{ encurtar }}'
+          imoveis: '{{ imoveis }}'
+          parametros_extra: '{{ parametros_extra }}'
+    - name: post-rede-sincronizarimovel
+      tool: http
+      description: Sincroniza um imóvel com a rede
+      tags:
+        - imovel
+      readOnly: false
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código do imóvel (integer)
+        - name: imobiliaria
+          type: integer
+          required: true
+          description: Código da imobiliária (integer)
+      execution:
+        method: POST
+        path: /rede/sincronizar_imovel
+        query:
+          codigo: '{{ codigo }}'
+          imobiliaria: '{{ imobiliaria }}'
+    - name: get-pipes-listar
+      tool: http
+      description: Lista os pipes disponíveis para a empresa
+      tags:
+        - pipeline
+      parameters:
+        - name: empresa
+          type: integer
+          required: true
+          description: Código da Empresa (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de Pipes e Paginação. Campos disponíveis ('fields'): 'Codigo', 'Nome',
+            'Empresa' (string/json)
+      execution:
+        method: GET
+        path: /pipes/listar
+        query:
+          empresa: '{{ empresa }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: get-pipes-detalhes
+      tool: http
+      description: Lista os detalhes do pipe selecionado
+      tags:
+        - pipeline
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código do Pipe (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de Pipes. Campos disponíveis ('fields'): 'Codigo', 'Nome', 'Empresa'
+            (string/json)
+      execution:
+        method: GET
+        path: /pipes/detalhes
+        query:
+          codigo: '{{ codigo }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: get-pipes-etapas
+      tool: http
+      description: Lista as etapas do pipe selecionado
+      tags:
+        - pipeline
+      parameters:
+        - name: codigo
+          type: integer
+          required: true
+          description: Código do Pipe (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de Pipes e Paginação. Campos disponíveis ('fields'): 'CodigoPipe',
+            'NomePipe', 'Codigo', 'NomeEtapa', 'Ordem', 'DiasPrevisto', 'UnidadesPrevisto' (string/json)
+      execution:
+        method: GET
+        path: /pipes/etapas
+        query:
+          codigo: '{{ codigo }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: get-negocios-listar
+      tool: http
+      description: Lista os negócios do pipe ou cliente selecionado
+      tags:
+        - pipeline
+      parameters:
+        - name: codigo_pipe
+          type: integer
+          required: true
+          description: Código do Pipe do Negócio (integer)
+        - name: codigo_cliente
+          type: integer
+          required: true
+          description: Código do Cliente do Negócio (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de Negócios e Paginação. Campos disponíveis ('fields'): 'Codigo'(codigo ou
+            placa, de acordo com configuração da imobiliaria), 'NomePipe', 'UltimaAtualizacao', ''NomeNegocio',
+            'Status', 'DataInicial', 'DataFinal', 'ValorNegocio', 'PrevisaoFechamento', 'VeiculoCaptacao',
+            'CodigoMotivoPerda', 'MotivoPerda', 'ObservacaoPerda', 'CodigoPipe', 'EtapaAtual', 'NomeEtapa' ,
+            'CodigoCliente', 'NomeCliente', 'FotoCliente', 'CodigoImovel', 'StatusAtividades
+      execution:
+        method: GET
+        path: /negocios/listar
+        query:
+          codigo_pipe: '{{ codigo_pipe }}'
+          codigo_cliente: '{{ codigo_cliente }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: get-negocios-detalhes
+      tool: http
+      description: Lista os detalhes do negócio selecionado
+      tags:
+        - pipeline
+      parameters:
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Código do Negócio (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de Negócios. Campos disponíveis ('fields'): 'Codigo', 'NomeNegocio',
+            'Status', 'DataInicial', 'DataFinal', 'ValorNegocio', 'PrevisaoFechamento', 'VeiculoCaptacao',
+            'CodigoMotivoPerda', 'MotivoPerda', 'ObservacaoPerda', 'CodigoPipe', 'EtapaAtual', 'NomeEtapa' ,
+            'CodigoCliente', 'CodigoImovel', 'FotoCliente', 'TempoDasEtapasDoNegocio', 'NomeCliente', 'EmailCliente',
+            'TelefoneCliente', 'CelularCliente' (string/json)
+      execution:
+        method: GET
+        path: /negocios/detalhes
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: post-negocios-detalhes
+      tool: http
+      description: Cadastra um Negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para cadastrar Negócios. Campos disponíveis ('fields'): 'NomeNegocio', 'Status',
+            'ValorNegocio', 'PrevisaoFechamento', 'VeiculoCaptacao', 'CodigoPipe', 'EtapaAtual', 'CodigoCliente',
+            'CodigoImovel' (string)
+      execution:
+        method: POST
+        path: /negocios/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-negocios-detalhes
+      tool: http
+      description: Altera um Negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para editar o negócio. Campos disponíveis ('fields'): 'NomeNegocio', 'ValorNegocio',
+            'VeiculoCaptacao', 'PrevisaoFechamento' (string/json)
+      execution:
+        method: PUT
+        path: /negocios/detalhes
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: delete-negocios-detalhes
+      tool: http
+      description: Remove um Negócio
+      tags:
+        - pipeline
+      readOnly: false
+      execution:
+        method: DELETE
+        path: /negocios/detalhes
+    - name: post-negocios-corretores
+      tool: http
+      description: Insere um Corretor no Negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para inserir corretor no negócio Negócios. Campos disponíveis ('fields'):
+            'CodigoNegocio', 'CorretorNegocio' (string)
+      execution:
+        method: POST
+        path: /negocios/corretores
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-negocios-corretores
+      tool: http
+      description: Altera um Corretor no Negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para editar o corretor no negócio. Campos disponíveis ('fields'): 'CodigoNegocio',
+            'CorretorNovo', 'CorretorAnterior' (string/json)
+      execution:
+        method: PUT
+        path: /negocios/corretores
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: delete-negocios-corretores
+      tool: http
+      description: Remove um Corretor do Negócio
+      tags:
+        - pipeline
+      readOnly: false
+      execution:
+        method: DELETE
+        path: /negocios/corretores
+    - name: get-negocios-veiculocaptacao
+      tool: http
+      description: Lista os veículos de captação da empresa
+      tags:
+        - pipeline
+      parameters:
+        - name: codigo_empresa
+          type: integer
+          required: true
+          description: Código da Empresa (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de Veiculos de Captação. Campos disponíveis ('fields'):
+            'CodigoVeiculoCaptacao', 'VeiculoCaptacao', 'CodigoEmpresa' (string/json)
+      execution:
+        method: GET
+        path: /negocios/veiculo_captacao
+        query:
+          codigo_empresa: '{{ codigo_empresa }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: post-negocios-veiculocaptacao
+      tool: http
+      description: Insere um Veiculo de Captação
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para inserir Veículo de Captação para a Empresa. Campos disponíveis ('fields'):
+            'VeiculoCaptacao' (string)
+      execution:
+        method: POST
+        path: /negocios/veiculo_captacao
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: get-negocios-atividades
+      tool: http
+      description: Lista as atividades do negócio
+      tags:
+        - negocios
+      parameters:
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Código do Negócio (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de atividades. Campos disponíveis ('fields'): 'CodigoImovel',
+            'ValorProposta', 'EstadoProposta'(da proposta, se houver), 'TextoProposta', 'Aceitacao', 'Automatico',
+            'Numero', 'Texto', 'Pendente', 'Assunto', 'EtapaAcaoId', 'EtapaAcao', 'TipoAtividade', 'TipoAtividadeId',
+            'MotivoLost', 'CodigoEmImovel', 'Hora', 'Lead', 'AtividadeCreatedAt', 'AtividadeUpdatedAt', 'Data',
+            'CodigoCliente', 'CodigoAtividade', 'CodigoCorretor', 'NumeroAgenda', 'DataH
+      execution:
+        method: GET
+        path: /negocios/atividades
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: post-negocios-atividades
+      tool: http
+      description: Insere uma atividade no negócio
+      tags:
+        - negocios
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para cadastro. Campos disponíveis ('fields'): 'CodigoCliente', 'CodigoCorretor',
+            'CodigoNegocio', 'Assunto', 'Texto', 'Data', 'Hora', 'Duracao', 'TipoAtividade', 'Realizada' (string)
+      execution:
+        method: POST
+        path: /negocios/atividades
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-negocios-atividades
+      tool: http
+      description: Editar atividades de um negócio
+      tags:
+        - negocios
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: 'JSON com os campos para edição. Campos disponíveis (''fields''): ''variaveis como relatado acima'' (string/json)'
+      execution:
+        method: PUT
+        path: /negocios/atividades
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: delete-negocios-atividades
+      tool: http
+      description: Deleta um anexos do perfil
+      tags:
+        - negocios
+      readOnly: false
+      parameters:
+        - name: AtividadeNumero
+          type: integer
+          required: true
+          description: Número da atividade (integer)
+        - name: CodigoNegocio
+          type: integer
+          required: true
+          description: Codigo do negócio (integer)
+      execution:
+        method: DELETE
+        path: /negocios/atividades
+        query:
+          AtividadeNumero: '{{ AtividadeNumero }}'
+          CodigoNegocio: '{{ CodigoNegocio }}'
+    - name: get-negocios-anexos
+      tool: http
+      description: Lista os anexos do negócio
+      tags:
+        - negocios
+      parameters:
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Código do Negócio (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de anexos. Campos disponíveis ('fields'): 'CodigoCliente', 'Status',
+            'Observacao', 'FinalidadeId', 'Descricao', 'Arquivo', 'CodigoUsuario', 'Origem', 'CreatedAt', 'UpdatedAt'
+            (string/json)
+      execution:
+        method: GET
+        path: /negocios/anexos
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: post-negocios-anexos
+      tool: http
+      description: Insere um anexo ao negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: 'JSON com os campos para cadastro. Campos disponíveis (''fields''): ''Anexos''(array) (string)'
+        - name: codigo_negocio
+          type: string
+          required: true
+          description: Codigo do negócio (string)
+      execution:
+        method: POST
+        path: /negocios/anexos
+        query:
+          cadastro: '{{ cadastro }}'
+          codigo_negocio: '{{ codigo_negocio }}'
+    - name: delete-negocios-anexos
+      tool: http
+      description: Deleta um anexos do perfil
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Codigo do negócio (integer)
+        - name: anexos
+          type: string
+          required: true
+          description: JSON com os códigos do anexos (string/json)
+      execution:
+        method: DELETE
+        path: /negocios/anexos
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+          anexos: '{{ anexos }}'
+    - name: get-negocios-imoveis
+      tool: http
+      description: Lista os imóveis do negócio
+      tags:
+        - negocios
+      parameters:
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Código do Negócio (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de imóveis. Campos disponíveis ('fields'): 'CodigoCliente', 'Status',
+            'Observacao', 'FinalidadeId', 'Descricao', 'Arquivo', 'CodigoUsuario', 'Origem', 'CreatedAt', 'UpdatedAt'
+            (string/json)
+      execution:
+        method: GET
+        path: /negocios/imoveis
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: post-negocios-imoveis
+      tool: http
+      description: Insere um imóvel ao negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: 'JSON com os campos para cadastro. Campos disponíveis (''fields''): ''imoveis''(array) (string)'
+        - name: codigo_negocio
+          type: string
+          required: true
+          description: Codigo do negócio (string)
+      execution:
+        method: POST
+        path: /negocios/imoveis
+        query:
+          cadastro: '{{ cadastro }}'
+          codigo_negocio: '{{ codigo_negocio }}'
+    - name: delete-negocios-imoveis
+      tool: http
+      description: Remove os imóveis de um negócio
+      tags:
+        - negocios
+      readOnly: false
+      parameters:
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Código do Negócio (integer)
+        - name: imoveis
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para a deleção de imóveis. Campos disponíveis ('codigos_imoveis'): ['1', '2', '33']
+            (string/json)
+      execution:
+        method: DELETE
+        path: /negocios/imoveis
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+          imoveis: '{{ imoveis }}'
+    - name: post-negocios-fechar
+      tool: http
+      description: Realiza o fechamento do negócio (Ganho ou Perda)
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: JSON com os campos para cadastro. Campos disponíveis ('fields') (string)
+        - name: negocio
+          type: string
+          required: true
+          description: Codigo do negócio (string)
+        - name: tipo_fechamento
+          type: string
+          required: true
+          description: O tipo do fechamento (ganho ou perdido) (string)
+      execution:
+        method: POST
+        path: /negocios/fechar
+        query:
+          cadastro: '{{ cadastro }}'
+          negocio: '{{ negocio }}'
+          tipo_fechamento: '{{ tipo_fechamento }}'
+    - name: post-imoveis-videos
+      tool: http
+      description: Insere um vídeo no imóvel
+      tags:
+        - imoveis
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: string
+          required: true
+          description: Referência do imóvel (Codigo) (string)
+        - name: cadastro
+          type: string
+          required: true
+          description: Dados do vídeo a ser inserido (string)
+      execution:
+        method: POST
+        path: /imoveis/videos
+        query:
+          imovel: '{{ imovel }}'
+          cadastro: '{{ cadastro }}'
+    - name: put-imoveis-videos
+      tool: http
+      description: Atualiza um vídeo do imóvel
+      tags:
+        - imoveis
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: string
+          required: true
+          description: Referência do imóvel (Codigo) (string)
+        - name: codigo_video
+          type: string
+          required: true
+          description: Referência do vídeo (Codigo) (string)
+        - name: cadastro
+          type: string
+          required: true
+          description: Dados do vídeo a ser inserido (string/json)
+      execution:
+        method: PUT
+        path: /imoveis/videos
+        query:
+          imovel: '{{ imovel }}'
+          codigo_video: '{{ codigo_video }}'
+          cadastro: '{{ cadastro }}'
+    - name: delete-imoveis-videos
+      tool: http
+      description: Deleta um vídeo do imóvel
+      tags:
+        - imoveis
+      readOnly: false
+      parameters:
+        - name: imovel
+          type: string
+          required: true
+          description: Referência do imóvel (Codigo) (string)
+        - name: video
+          type: integer
+          required: true
+          description: Código do vídeo do imóvel (integer)
+      execution:
+        method: DELETE
+        path: /imoveis/videos
+        query:
+          imovel: '{{ imovel }}'
+          video: '{{ video }}'
+    - name: get-negocios-perfil-interesse
+      tool: http
+      description: Lista os perfil de interesse do negócio selecionado
+      tags:
+        - pipeline
+      parameters:
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Código do Negócio (integer)
+        - name: pesquisa
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para pesquisa de Negócios. Campos disponíveis ('fields'): 'Endereco', 'Empreendimento',
+            'Codigo', 'AreaTotal', 'AreaPrivativa', 'ValorVenda', 'ValorLocacao', 'Status', 'Bairro', 'Cidade',
+            'Dormitorios', 'Suites', 'Vagas', 'Categoria', 'CodigoPerfil', 'Tipo', 'NomeNegocio', 'CodigoCliente',
+            'CodigoCliente' (string/json)
+      execution:
+        method: GET
+        path: /negocios/perfil/interesse
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+          pesquisa: '{{ pesquisa }}'
+    - name: post-negocios-perfil-interesse
+      tool: http
+      description: Insere um perfil ao negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para cadastro. Campos disponíveis ('fields'): 'CodigoCliente', 'CodigoCorretor',
+            'CodigoNegocio', 'Tipo', 'Codigo', 'Endereco', 'Empreendimento',... (string)
+      execution:
+        method: POST
+        path: /negocios/perfil/interesse
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-negocios-perfil-interesse
+      tool: http
+      description: Atualiza um perfil associado ao negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para cadastro. Campos disponíveis ('fields'): 'CodigoCliente', 'CodigoCorretor',
+            'CodigoNegocio', 'Tipo', 'Codigo', 'Endereco', 'Empreendimento', ... (string/json)
+      execution:
+        method: PUT
+        path: /negocios/perfil/interesse
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: delete-negocios-perfil-interesse
+      tool: http
+      description: Remove perfil do negpocio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: codigo_negocio
+          type: string
+          required: true
+          description: Codigo do negócio (string)
+      execution:
+        method: DELETE
+        path: /negocios/perfil/interesse
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+    - name: get-negocios-perfil-interesse-listarcampos
+      tool: http
+      description: Lista campos de perfil associado ao négocio
+      tags:
+        - pipeline
+      parameters:
+        - name: desc
+          type: boolean
+          required: true
+          description: Listar a descrição de cada campo (boolean)
+        - name: tipo
+          type: string
+          required: true
+          description: Filtrar por categoria de campos (string)
+      execution:
+        method: GET
+        path: /negocios/perfil/interesse/listarcampos
+        query:
+          desc: '{{ desc }}'
+          tipo: '{{ tipo }}'
+    - name: get-features-detalhes
+      tool: http
+      description: Lista os veículos de captação da empresa
+      tags:
+        - feature
+      parameters:
+        - name: codigo_feature
+          type: integer
+          required: true
+          description: Código da Feature (integer)
+      execution:
+        method: GET
+        path: /features/detalhes
+        query:
+          codigo_feature: '{{ codigo_feature }}'
+    - name: get-features-listar
+      tool: http
+      description: Lista as features do cliente
+      tags:
+        - feature
+      execution:
+        method: GET
+        path: /features/listar
+    - name: put-negocios-etapas
+      tool: http
+      description: Altera a etapa do negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Codigo do negócio (integer)
+        - name: nome_etapa
+          type: string
+          required: true
+          description: Nome da etapa (string)
+      execution:
+        method: PUT
+        path: /negocios/etapas
+        query:
+          codigo_negocio: '{{ codigo_negocio }}'
+          nome_etapa: '{{ nome_etapa }}'
+    - name: post-negocios-visita
+      tool: http
+      description: Agendando visita ao negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para cadastro. Campos disponíveis ('fields'): 'CodigoImovel', 'CodigoCorretor',
+            'CodigoNegocio', 'Data', 'Hora', 'Duracao', 'Realizada','Texto' (string)
+      execution:
+        method: POST
+        path: /negocios/visita
+        query:
+          cadastro: '{{ cadastro }}'
+    - name: put-negocios-visita
+      tool: http
+      description: Atualiza um visita do negócio
+      tags:
+        - pipeline
+      readOnly: false
+      parameters:
+        - name: cadastro
+          type: string
+          required: true
+          description: >-
+            JSON com os campos para cadastro. Campos disponíveis ('fields'): 'Data', 'CodigoCorretor', 'Hora',
+            'Duracao', 'Texto', 'Acao' (string/json)
+        - name: codigo_negocio
+          type: integer
+          required: true
+          description: Código do Negócio (integer)
+        - name: numero_visita
+          type: integer
+          required: true
+          description: Número da visita (integer)
+      execution:
+        method: PUT
+        path: /negocios/visita
+        query:
+          cadastro: '{{ cadastro }}'
+          codigo_negocio: '{{ codigo_negocio }}'
+          numero_visita: '{{ numero_visita }}'
+    - name: get-imoveis-prontuario
+      tool: http
+      description: Lista os prontuários do imóvel
+      tags:
+        - imoveis
+      parameters:
+        - name: pesquisa
+          type: string
+          required: true
+          description: JSON com os critérios de busca desejados (string/json)
+        - name: imovel
+          type: string
+          required: true
+          description: Codigo do imovel no qual deseja trazer o prontuário (int/string)
+        - name: listCodigos
+          type: string
+          required: true
+          description: Lista codigos do imoveis dos prontuários, pode ser passado filtros e sem v2 (int/string)
+        - name: listAssuntos
+          type: string
+          required: true
+          description: Lista dos assuntos dos prontuários e sem v2 (int/string)
+      execution:
+        method: GET
+        path: /imoveis/prontuario
+        query:
+          pesquisa: '{{ pesquisa }}'
+          imovel: '{{ imovel }}'
+          listCodigos: '{{ listCodigos }}'
+          listAssuntos: '{{ listAssuntos }}'
+    - name: get-integration-name-action
+      tool: http
+      description: Integrações.
+      tags:
+        - integracoes
+      parameters:
+        - name: name
+          type: string
+          required: true
+          description: (string)
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: GET
+        path: /integration/{{ name }}/{{ action }}
+    - name: post-integration-name-action
+      tool: http
+      description: Integrações.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: name
+          type: string
+          required: true
+          description: (string)
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: POST
+        path: /integration/{{ name }}/{{ action }}
+    - name: put-integration-name-action
+      tool: http
+      description: Integrações.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: name
+          type: string
+          required: true
+          description: (string)
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: PUT
+        path: /integration/{{ name }}/{{ action }}
+    - name: delete-integration-name-action
+      tool: http
+      description: Integrações.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: name
+          type: string
+          required: true
+          description: (string)
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: DELETE
+        path: /integration/{{ name }}/{{ action }}
+    - name: get-faq-name-action
+      tool: http
+      description: Perguntas frequentes.
+      tags:
+        - integracoes
+      parameters:
+        - name: name
+          type: string
+          required: true
+          description: (string)
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: GET
+        path: /faq/{{ name }}/{{ action }}
+    - name: post-faq-name-action
+      tool: http
+      description: Perguntas frequentes.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: name
+          type: string
+          required: true
+          description: (string)
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: POST
+        path: /faq/{{ name }}/{{ action }}
+    - name: put-faq-name-action
+      tool: http
+      description: Perguntas frequentes.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: name
+          type: string
+          required: true
+          description: (string)
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: PUT
+        path: /faq/{{ name }}/{{ action }}
+    - name: delete-faq-name-action
+      tool: http
+      description: Perguntas frequentes.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: name
+          type: string
+          required: true
+          description: (string)
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: DELETE
+        path: /faq/{{ name }}/{{ action }}
+    - name: get-feature-action
+      tool: http
+      description: Features.
+      tags:
+        - integracoes
+      parameters:
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: GET
+        path: /feature/{{ action }}
+    - name: post-feature-action
+      tool: http
+      description: Features.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: POST
+        path: /feature/{{ action }}
+    - name: get-webhook-action
+      tool: http
+      description: Webhooks.
+      tags:
+        - integracoes
+      parameters:
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: GET
+        path: /webhook/{{ action }}
+    - name: post-webhook-action
+      tool: http
+      description: Webhooks.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: POST
+        path: /webhook/{{ action }}
+    - name: put-webhook-action
+      tool: http
+      description: Webhooks.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: PUT
+        path: /webhook/{{ action }}
+    - name: delete-webhook-action
+      tool: http
+      description: Webhooks.
+      tags:
+        - integracoes
+      readOnly: false
+      parameters:
+        - name: action
+          type: string
+          required: true
+          description: (string)
+      execution:
+        method: DELETE
+        path: /webhook/{{ action }}

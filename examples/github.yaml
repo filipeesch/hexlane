@@ -1,23 +1,22 @@
 version: 1
 integration:
   id: github
-  description: "GitHub REST API — public endpoints, no authentication required"
-
+  description: GitHub REST API — public endpoints, no authentication required
   targets:
     - id: github
-      tool: http
-      config:
-        base_url: https://api.github.com
-      credential:
-        kind: public
-
+      tools:
+        - type: http
+          config:
+            base_url: https://api.github.com
+          credential:
+            kind: public
   operations:
-    # ── User ──────────────────────────────────────────────────────────────────
     - name: get-user
       tool: http
-      defaultTarget: github
       description: Fetch a public GitHub user profile
-      tags: [users, read]
+      tags:
+        - users
+        - read
       readOnly: true
       parameters:
         - name: username
@@ -30,13 +29,12 @@ integration:
       examples:
         - description: Fetch the torvalds profile
           command: hexlane op run github/get-user --param username=torvalds
-
-    # ── Repository ────────────────────────────────────────────────────────────
     - name: get-repo
       tool: http
-      defaultTarget: github
       description: Fetch metadata for a public repository
-      tags: [repos, read]
+      tags:
+        - repos
+        - read
       readOnly: true
       parameters:
         - name: owner
@@ -53,13 +51,13 @@ integration:
       examples:
         - description: Fetch the linux kernel repo
           command: hexlane op run github/get-repo --param owner=torvalds --param repo=linux
-
-    # ── Issues ────────────────────────────────────────────────────────────────
     - name: list-issues
       tool: http
-      defaultTarget: github
       description: List issues for a public repository, with optional filters
-      tags: [repos, issues, read]
+      tags:
+        - repos
+        - issues
+        - read
       readOnly: true
       parameters:
         - name: owner
@@ -73,7 +71,7 @@ integration:
         - name: state
           type: string
           required: false
-          description: "Filter by state: open (default), closed, or all"
+          description: 'Filter by state: open (default), closed, or all'
         - name: labels
           type: string
           required: false
@@ -86,21 +84,23 @@ integration:
         method: GET
         path: /repos/{{ owner }}/{{ repo }}/issues
         query:
-          state: "{{ state }}"
-          labels: "{{ labels }}"
-          per_page: "{{ perPage }}"
+          state: '{{ state }}'
+          labels: '{{ labels }}'
+          per_page: '{{ perPage }}'
       examples:
         - description: List open issues in the hexlane repo
           command: hexlane op run github/list-issues --param owner=filipeesch --param repo=hexlane
         - description: List closed bug issues, 50 per page
-          command: hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=closed --param labels=bug --param perPage=50
-
-    # ── Contributors ──────────────────────────────────────────────────────────
+          command: >-
+            hexlane op run github/list-issues --param owner=torvalds --param repo=linux --param state=closed --param
+            labels=bug --param perPage=50
     - name: list-contributors
       tool: http
-      defaultTarget: github
       description: List contributors for a public repository, sorted by commit count
-      tags: [repos, contributors, read]
+      tags:
+        - repos
+        - contributors
+        - read
       readOnly: true
       parameters:
         - name: owner
@@ -119,7 +119,7 @@ integration:
         method: GET
         path: /repos/{{ owner }}/{{ repo }}/contributors
         query:
-          per_page: "{{ perPage }}"
+          per_page: '{{ perPage }}'
       examples:
         - description: Top contributors to the linux kernel
           command: hexlane op run github/list-contributors --param owner=torvalds --param repo=linux --param perPage=10

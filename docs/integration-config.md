@@ -1,6 +1,6 @@
 # Integration Configuration
 
-An **integration** is a single YAML file that defines everything needed to work with an external system: one or more **targets** (named, configured instances of a tool) and the **operations** available against them.
+An **integration** is a single YAML file that defines everything needed to work with an external system: one or more **targets** (named, configured instances of one or more tools) and the **operations** available against them.
 
 ```bash
 hexlane integration add --file ./github.yaml
@@ -20,44 +20,47 @@ version: 1
 integration:
   id: my-app                  # unique identifier for this integration
   description: "My App API"   # optional
+  defaultTarget: my-app-api-prod  # optional — used when --target is not provided at run time
 
   targets:
-    - id: my-app-api-prod     # unique — used in op run / http call / sql query
-      tool: http              # "http" or "sql"
-      config:
-        base_url: https://api.example.com
+    - id: my-app-api-prod     # unique target identifier
       params:                 # optional — static key-value pairs injected into op templates
         datasource_uid: abc123
-      credential:
-        kind: public
+      tools:
+        - type: http          # "http", "sql", or "fs"
+          config:
+            base_url: https://api.example.com
+          credential:
+            kind: public
 
   operations:
     - name: get-order
-      tool: http
-      defaultTarget: my-app-api-prod
+      tool: http              # matches the tool type in the target's tools list
       ...
 ```
 
-- `integration.id` — identifies the integration; used in `hexlane integration show <id>`
-- `targets[].id` — the runtime namespace: `op run <target-id>/<op-name>`, `http call <target-id>`
-- `operations` — live alongside targets in the same file; `defaultTarget` links an operation to its default target
+- `integration.id` — identifies the integration; used in `hexlane integration show <id>` and `op run <integration-id>/<op-name>`
+- `integration.defaultTarget` — optional; the target used when `--target` is not given at run time. If unset and no `--target` is given, `op run` errors and lists compatible targets (see `hexlane op targets <integration-id>/<op-name>`)
+- `targets[].id` — the runtime namespace for tool commands
+- `targets[].tools` — one or more tool entries, each with a `type`, optional `config`, and optional `credential`. Operations select the matching entry by `type`.
 
 ---
 
 ## `targets` — Tool instances
 
-Each target in the array is a named, configured instance of a tool pointing at a specific system.
+Each target is a named entry with a `tools` array. Each tool entry in the array has `type`, an optional `config` map, and an optional `credential`.
 
 ### HTTP target
 
 ```yaml
 targets:
   - id: my-app-api-prod
-    tool: http
-    config:
-      base_url: https://api.example.com
-    credential:
-      kind: public
+    tools:
+      - type: http
+        config:
+          base_url: https://api.example.com
+        credential:
+          kind: public
 ```
 
 ### SQL target
@@ -65,16 +68,17 @@ targets:
 ```yaml
 targets:
   - id: my-app-db-prod
-    tool: sql
-    config:
-      engine: postgresql      # postgresql | mysql | sqlserver | oracle
-      host: db.prod.example.com
-      port: 5432
-      database: app_production
-    credential:
-      kind: db_connection
-      acquire_strategy:
-        kind: static
+    tools:
+      - type: sql
+        config:
+          engine: postgresql      # postgresql | mysql | sqlserver | oracle
+          host: db.prod.example.com
+          port: 5432
+          database: app_production
+        credential:
+          kind: db_connection
+          acquire_strategy:
+            kind: static
 ```
 
 ### Multiple targets in one integration
@@ -82,37 +86,68 @@ targets:
 ```yaml
 targets:
   - id: my-app-api-staging
-    tool: http
-    config:
-      base_url: https://staging.api.example.com
-    credential:
-      kind: api_token
-      acquire_strategy:
-        kind: static
-      auth:
-        kind: bearer
+    tools:
+      - type: http
+        config:
+          base_url: https://staging.api.example.com
+        credential:
+          kind: api_token
+          acquire_strategy:
+            kind: static
+          auth:
+            kind: bearer
 
   - id: my-app-api-prod
-    tool: http
-    config:
-      base_url: https://api.example.com
-    credential:
-      kind: api_token
-      acquire_strategy:
-        kind: static
-      auth:
-        kind: bearer
+    tools:
+      - type: http
+        config:
+          base_url: https://api.example.com
+        credential:
+          kind: api_token
+          acquire_strategy:
+            kind: static
+          auth:
+            kind: bearer
 
   - id: my-app-db-prod
-    tool: sql
-    config:
-      engine: postgresql
-      host: db.prod.example.com
-      database: app_production
-    credential:
-      kind: db_connection
-      acquire_strategy:
-        kind: static
+    tools:
+      - type: sql
+        config:
+          engine: postgresql
+          host: db.prod.example.com
+          database: app_production
+        credential:
+          kind: db_connection
+          acquire_strategy:
+            kind: static
+```
+
+### Target with multiple tool types
+
+A single target can expose more than one tool type (e.g. both HTTP and SQL):
+
+```yaml
+targets:
+  - id: my-app-prod
+    tools:
+      - type: http
+        config:
+          base_url: https://api.example.com
+        credential:
+          kind: api_token
+          acquire_strategy:
+            kind: static
+          auth:
+            kind: bearer
+      - type: sql
+        config:
+          engine: postgresql
+          host: db.prod.example.com
+          database: app_production
+        credential:
+          kind: db_connection
+          acquire_strategy:
+            kind: static
 ```
 
 ---
@@ -126,30 +161,32 @@ This is useful when the same operation runs against multiple targets but a templ
 ```yaml
 targets:
   - id: grafana-staging
-    tool: http
-    config:
-      base_url: https://grafana.staging.example.com
     params:
       datasource_uid: ben9xq9lzod8gf   # injected automatically — no --param needed
-    credential:
-      kind: api_token
-      acquire_strategy:
-        kind: static
-      auth:
-        kind: bearer
+    tools:
+      - type: http
+        config:
+          base_url: https://grafana.staging.example.com
+        credential:
+          kind: api_token
+          acquire_strategy:
+            kind: static
+          auth:
+            kind: bearer
 
   - id: grafana-prod
-    tool: http
-    config:
-      base_url: https://grafana.prod.example.com
     params:
       datasource_uid: "000000029"
-    credential:
-      kind: api_token
-      acquire_strategy:
-        kind: static
-      auth:
-        kind: bearer
+    tools:
+      - type: http
+        config:
+          base_url: https://grafana.prod.example.com
+        credential:
+          kind: api_token
+          acquire_strategy:
+            kind: static
+          auth:
+            kind: bearer
 ```
 
 For the injected key to be accepted without error, declare it as `required: false` in the operation's `parameters` list. Only keys that the operation declares are injected — extra keys in `params` are silently ignored, so a single shared `params` block won't break operations that don't use every key.
@@ -302,9 +339,9 @@ renewal_policy:
 
 ---
 
-## `operations` — Defining operations {#http-operation}
+## `operations` — Defining operations
 
-Operations live inside `integration.operations`. Each references a target via `defaultTarget`.
+Operations live inside `integration.operations`. Each declares a `tool` type that must match a tool entry in the target's `tools` array. The target to use at run time is selected by `integration.defaultTarget` or the `--target` flag; if neither is set, `op run` errors and suggests compatible targets.
 
 ### HTTP operation
 
@@ -312,7 +349,6 @@ Operations live inside `integration.operations`. Each references a target via `d
 operations:
   - name: get-order
     tool: http
-    defaultTarget: my-app-api-prod
     description: Fetch a single order by ID
     parameters:
       - name: orderId
@@ -329,7 +365,6 @@ operations:
 ```yaml
   - name: list-issues
     tool: http
-    defaultTarget: github
     parameters:
       - name: owner
         type: string
@@ -357,7 +392,6 @@ operations:
 ```yaml
   - name: create-order
     tool: http
-    defaultTarget: my-app-api-prod
     parameters:
       - name: orderType
         type: string
@@ -378,7 +412,6 @@ operations:
 ```yaml
   - name: find-failed-charges
     tool: sql
-    defaultTarget: my-app-db-prod
     parameters:
       - name: since
         type: string
@@ -404,19 +437,20 @@ version: 1
 integration:
   id: github
   description: "GitHub REST API — public endpoints, no authentication required"
+  defaultTarget: github
 
   targets:
     - id: github
-      tool: http
-      config:
-        base_url: https://api.github.com
-      credential:
-        kind: public
+      tools:
+        - type: http
+          config:
+            base_url: https://api.github.com
+          credential:
+            kind: public
 
   operations:
     - name: get-user
       tool: http
-      defaultTarget: github
       description: Fetch a GitHub user profile
       parameters:
         - name: username
@@ -429,7 +463,6 @@ integration:
 
     - name: list-repos
       tool: http
-      defaultTarget: github
       description: List public repositories for a user
       parameters:
         - name: username

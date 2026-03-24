@@ -65,18 +65,22 @@ toolRegistry.register({
                     if (!found) die(`Target "${targetId}" not found in any registered integration.`);
                     const { integrationId, target } = found;
 
-                    if (target.tool !== "sql") {
-                        die(`Target "${targetId}" uses tool "${target.tool}", not "sql".`);
+                    const sqlTool = target.tools.find((t) => t.type === "sql");
+                    if (!sqlTool) {
+                        die(`Target "${targetId}" has no sql tool configured.`);
+                        return;
                     }
-                    if (!target.credential) {
-                        die(`Target "${targetId}" has no credential configured.`);
+                    if (!sqlTool.credential) {
+                        die(`Target "${targetId}" sql tool has no credential configured.`);
+                        return;
                     }
-                    if (target.credential.kind !== "db_connection") {
-                        die(`Target "${targetId}" credential is kind "${target.credential.kind}", not "db_connection".`);
+                    if (sqlTool.credential.kind !== "db_connection") {
+                        die(`Target "${targetId}" sql tool credential is kind "${sqlTool.credential.kind}", not "db_connection".`);
+                        return;
                     }
 
                     await ctx.vault.unlock();
-                    const credential = await ctx.resolver.resolveForTarget(integrationId, targetId, target.credential);
+                    const credential = await ctx.resolver.resolveForTarget(integrationId, targetId, sqlTool.credential);
                     if (!credential) {
                         die(`Target "${targetId}" credential resolved to null — check credential kind.`);
                     }

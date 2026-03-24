@@ -5,8 +5,8 @@
  */
 import * as fs from "fs";
 import * as yaml from "js-yaml";
-import { OperationSchema } from "./schema.js";
-import type { Operation } from "./schema.js";
+import { OperationSchema, ToolOperationSchema } from "./schema.js";
+import type { Operation, ToolOperation } from "./schema.js";
 
 // ─── Param spec parsing ───────────────────────────────────────────────────────
 
@@ -162,4 +162,122 @@ export function deleteOperationFromFile(configPath: string, opName: string): voi
     app["operations"] = ops;
     raw["app"] = app;
     writeAppYaml(configPath, raw);
+}
+
+// ─── Integration YAML helpers ─────────────────────────────────────────────────
+
+function readIntegrationYaml(configPath: string): Record<string, unknown> {
+    return yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+}
+
+function writeIntegrationYaml(configPath: string, raw: Record<string, unknown>): void {
+    fs.writeFileSync(configPath, yaml.dump(raw, { lineWidth: 120, noRefs: true }), "utf8");
+}
+
+/**
+ * Return the raw YAML text of a single operation from an integration config file.
+ * Throws if the operation is not found.
+ */
+export function getIntegrationOperationYaml(configPath: string, opName: string): string {
+    const raw = readIntegrationYaml(configPath);
+    const integration = raw["integration"] as Record<string, unknown>;
+    const ops = ((integration["operations"] ?? []) as Array<Record<string, unknown>>);
+    const op = ops.find((o) => o["name"] === opName);
+    if (!op) {
+        throw new Error(`Operation "${opName}" not found in ${configPath}.`);
+    }
+    return yaml.dump(op, { lineWidth: 120, noRefs: true });
+}
+
+/**
+ * Add a new operation to an integration YAML from a raw YAML string.
+ * Validates against ToolOperationSchema before writing.
+ * Throws on name collision or schema validation failure.
+ */
+export function addIntegrationOperationFromRaw(configPath: string, rawOpYaml: string): ToolOperation {
+    let parsed: unknown;
+    try {
+        parsed = yaml.load(rawOpYaml);
+    } catch (e: unknown) {
+        throw new Error(`Invalid YAML: ${(e as Error).message}`);
+    }
+
+    const result = ToolOperationSchema.safeParse(parsed);
+    if (!result.success) {
+        const issues = result.error.issues.map((e) => `  ${e.path.join(".")}: ${e.message}`).join("\n");
+        throw new Error(`Invalid operation:\n${issues}`);
+    }
+    const operation = result.data;
+
+    const raw = readIntegrationYaml(configPath);
+    const integration = raw["integration"] as Record<string, unknown>;
+    const ops = ((integration["operations"] ?? []) as Array<Record<string, unknown>>);
+
+    if (ops.some((op) => op["name"] === operation.name)) {
+        throw new Error(
+            `Operation "${operation.name}" already exists. Use 'hexlane op edit' to update it.`
+        );
+    }
+
+    ops.push(operation as unknown as Record<string, unknown>);
+    integration["operations"] = ops;
+    raw["integration"] = integration;
+    writeIntegrationYaml(configPath, raw);
+    return operation;
+}
+
+/**
+ * Replace an existing operation in an integration YAML from a raw YAML string.
+ * Validates against ToolOperationSchema before writing.
+ * Throws if the operation is not found or schema validation fails.
+ */
+export function editIntegrationOperation(configPath: string, opName: string, rawOpYaml: string): ToolOperation {
+    let parsed: unknown;
+    try {
+        parsed = yaml.load(rawOpYaml);
+    } catch (e: unknown) {
+        throw new Error(`Invalid YAML: ${(e as Error).message}`);
+    }
+
+    const result = ToolOperationSchema.safeParse(parsed);
+    if (!result.success) {
+        const issues = result.error.issues.map((e) => `  ${e.path.join(".")}: ${e.message}`).join("\n");
+        throw new Error(`Invalid operation:\n${issues}`);
+    }
+    const operation = result.data;
+
+    const raw = readIntegrationYaml(configPath);
+    const integration = raw["integration"] as Record<string, unknown>;
+    const ops = ((integration["operations"] ?? []) as Array<Record<string, unknown>>);
+
+    const idx = ops.findIndex((op) => op["name"] === opName);
+    if (idx < 0) {
+        throw new Error(`Operation "${opName}" not found in ${configPath}.`);
+    }
+
+    ops[idx] = operation as unknown as Record<string, unknown>;
+    integration["operations"] = ops;
+    raw["integration"] = integration;
+    writeIntegrationYaml(configPath, raw);
+    return operation;
+}
+
+/**
+ * Delete an operation by name from an integration YAML file.
+ * Throws if no operation with that name exists.
+ */
+export function deleteIntegrationOperation(configPath: string, opName: string): void {
+    const raw = readIntegrationYaml(configPath);
+    const integration = raw["integration"] as Record<string, unknown>;
+    const ops = ((integration["operations"] ?? []) as Array<Record<string, unknown>>);
+
+    const idx = ops.findIndex((op) => op["name"] === opName);
+    if (idx < 0) {
+        throw new Error(`Operation "${opName}" not found.`);
+    }
+
+    ops.splice(idx, 1);
+    integration["operations"] = ops;
+    raw["integration"] = integration;
+    writeIntegrationYaml(configPath, raw);
 }

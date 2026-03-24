@@ -1,4 +1,6 @@
 import { Command } from "commander";
+import * as fs from "fs";
+import * as yaml from "js-yaml";
 import { getContext } from "../context.js";
 import { output, outputTable, outputApiResponse, die, setJsonMode, setMachineMode } from "../output.js";
 import { setDebugMode } from "../debug.js";
@@ -9,9 +11,18 @@ import { renderApiExecution, renderDbExecution } from "../../operations/renderer
 import { validateOperation } from "../../operations/validator.js";
 import { executeApiCall } from "../../executors/api-executor.js";
 import { executeDbQuery } from "../../executors/db-executor.js";
-import { parseParamSpec, buildOperation, addOperationToFile, deleteOperationFromFile } from "../../operations/op-writer.js";
+import { parseParamSpec, buildOperation, addOperationToFile, deleteOperationFromFile, addIntegrationOperationFromRaw, editIntegrationOperation, deleteIntegrationOperation, getIntegrationOperationYaml } from "../../operations/op-writer.js";
 import type { ApiOperation, DbOperation } from "../../operations/schema.js";
 import type { HttpOperation, SqlOperation } from "../../operations/schema.js";
+
+async function readStdin(): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        process.stdin.on("data", (chunk: Buffer) => chunks.push(chunk));
+        process.stdin.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        process.stdin.on("error", reject);
+    });
+}
 
 export function registerOpCommands(program: Command): void {
     const op = program
@@ -24,7 +35,7 @@ export function registerOpCommands(program: Command): void {
         .description("List available operations")
         .option("--app <app>", "Filter by app ID (legacy model)")
         .option("--integration <id>", "Filter by integration ID")
-        .option("--filter <text>", "Case-insensitive text filter (matches name, description, tags)")
+        .option("--filter <text>", "Case-insensitive text filter (matches ref, tool, name, description, tags)")
         .option("--json", "Output as JSON")
         .option("--machine", "Output as TOON (structured format for AI/scripting consumption)")
         .action((opts: { app?: string; integration?: string; filter?: string; json?: boolean; machine?: boolean }) => {
@@ -38,7 +49,7 @@ export function registerOpCommands(program: Command): void {
             const intEntries = opts.app
                 ? []
                 : intRegistry.list(opts.integration, opts.filter).map((e) => ({
-                    ref: e.targetRef,
+                    ref: e.integrationRef,
                     tool: e.operation.tool,
                     description: e.operation.description ?? "",
                     tags: (e.operation.tags ?? []).join(", "),
@@ -76,72 +87,35 @@ export function registerOpCommands(program: Command): void {
     // ── op show ───────────────────────────────────────────────────────────────
     op
         .command("show <ref>")
-        .description("Show full metadata for an operation (e.g. bsp-forno/list-broker-integrations)")
-        .option("--json", "Output as JSON")
-        .option("--machine", "Output as TOON (structured format for AI/scripting consumption)")
+        .description("Show raw YAML for an integration operation or metadata for a legacy operation")
+        .option("--json", "Output as JSON (legacy model only)")
+        .option("--machine", "Output as TOON (legacy model only)")
         .action((ref: string, opts: { json?: boolean; machine?: boolean }) => {
-            if (opts.json) setJsonMode(true);
-            if (opts.machine) setMachineMode(true);
-
             const ctx = getContext();
 
-            // Try new integration model first
+            // Integration model → raw YAML output (pipeable)
             const intRegistry = new IntegrationOperationRegistry(ctx.integrations);
-            if (intRegistry.hasTargetRef(ref)) {
-                const entry = intRegistry.lookupByTargetRef(ref);
-                const op = entry.operation;
-
-                if (opts.json || opts.machine) {
-                    output({ integration: entry.integrationId, target: entry.targetId, ...op });
+            if (intRegistry.hasIntegrationRef(ref)) {
+                const entry = intRegistry.lookupByIntegrationRef(ref);
+                const intEntries = ctx.integrations.list();
+                const intEntry = intEntries.find((e) => e.id === entry.integrationId);
+                if (!intEntry) {
+                    die(`Integration "${entry.integrationId}" config not found.`);
                     return;
                 }
-
-                console.log(`\nOperation: ${entry.targetRef}`);
-                console.log(`  Tool:          ${op.tool}`);
-                console.log(`  Integration:   ${entry.integrationId}`);
-                console.log(`  Target:        ${entry.targetId}`);
-                if (op.description) console.log(`  Description: ${op.description}`);
-                if (op.defaultTarget) console.log(`  Default target: ${op.defaultTarget}`);
-                if (op.tags?.length) console.log(`  Tags:        ${op.tags.join(", ")}`);
-                if (op.tool === "sql") console.log(`  Read-only:   ${op.readOnly}`);
-
-                if (op.parameters.length > 0) {
-                    console.log(`\nParameters:`);
-                    outputTable(
-                        op.parameters.map((p) => ({
-                            name: p.name,
-                            type: p.type,
-                            required: String(p.required !== false),
-                            description: p.description ?? "",
-                        })),
-                        ["name", "type", "required", "description"],
-                    );
-                } else {
-                    console.log(`\nParameters: none`);
+                try {
+                    const yamlText = getIntegrationOperationYaml(intEntry.config_path, entry.operation.name);
+                    process.stdout.write(yamlText);
+                } catch (err) {
+                    die(err instanceof Error ? err.message : String(err));
                 }
-
-                if (op.tool === "http") {
-                    const exec = op.execution;
-                    console.log(`\nExecution:`);
-                    console.log(`  ${exec.method} ${exec.path}`);
-                    if (exec.body) console.log(`  Body: ${exec.body}`);
-                } else {
-                    console.log(`\nExecution:`);
-                    console.log(`  SQL: ${op.execution.sql}`);
-                }
-
-                if (op.examples?.length) {
-                    console.log(`\nExamples:`);
-                    for (const ex of op.examples) {
-                        console.log(`  # ${ex.description}`);
-                        console.log(`  ${ex.command}`);
-                    }
-                }
-                console.log();
                 return;
             }
 
             // Fall back to legacy model
+            if (opts.json) setJsonMode(true);
+            if (opts.machine) setMachineMode(true);
+
             const registry = new OperationRegistry(ctx.apps);
             const entry = registry.lookup(ref);
             const op = entry.operation;
@@ -203,6 +177,42 @@ export function registerOpCommands(program: Command): void {
             console.log();
         });
 
+    // ── op targets ────────────────────────────────────────────────────────────
+    op
+        .command("targets <ref>")
+        .description("List targets compatible with an integration operation (e.g. hexlane op targets bsp/sync)")
+        .option("--json", "Output as JSON")
+        .action((ref: string, opts: { json?: boolean }) => {
+            if (opts.json) setJsonMode(true);
+
+            const ctx = getContext();
+            const intRegistry = new IntegrationOperationRegistry(ctx.integrations);
+            if (!intRegistry.hasIntegrationRef(ref)) {
+                die(`Operation "${ref}" not found. Use 'hexlane op list' to see available operations.`);
+                return;
+            }
+            const entry = intRegistry.lookupByIntegrationRef(ref);
+            const compatible = intRegistry.getCompatibleTargets(entry.integrationId, entry.operation.tool);
+
+            if (opts.json) {
+                output({ ref, tool: entry.operation.tool, targets: compatible });
+                return;
+            }
+
+            if (compatible.length === 0) {
+                console.log(`No targets in integration "${entry.integrationId}" support tool "${entry.operation.tool}".`);
+                return;
+            }
+
+            outputTable(
+                compatible.map((t) => ({
+                    target: t,
+                    default: t === entry.targetId ? "✓" : "",
+                })),
+                ["target", "default"],
+            );
+        });
+
     // ── op validate ───────────────────────────────────────────────────────────
     op
         .command("validate <ref>")
@@ -236,7 +246,7 @@ export function registerOpCommands(program: Command): void {
     // ── op run ────────────────────────────────────────────────────────────────
     op
         .command("run <ref>")
-        .description("Run an operation (e.g. hexlane op run bsp-forno/list-broker-integrations)")
+        .description("Run an operation (e.g. hexlane op run bsp/list-broker-integrations)")
         .option("--target <target-id>", "Override the executing target (must belong to the same integration as the op)")
         .option("--env <name>", "Environment name (legacy model — overrides defaultEnv from the operation)")
         .option("--profile <name>", "Profile name (legacy model — overrides default profile from the operation)")
@@ -276,16 +286,41 @@ export function registerOpCommands(program: Command): void {
 
                 // ── Try new integration model first ──────────────────────────
                 const intRegistry = new IntegrationOperationRegistry(ctx.integrations);
-                if (intRegistry.hasTargetRef(ref) || opts.target) {
-                    const intEntry = opts.target
-                        ? intRegistry.lookupWithTargetOverride(ref, opts.target)
-                        : intRegistry.lookupByTargetRef(ref);
-                    const { integrationId, targetId, operation } = intEntry;
+                if (intRegistry.hasIntegrationRef(ref)) {
+                    const base = intRegistry.lookupByIntegrationRef(ref);
+                    const { integrationId, operation } = base;
+
+                    // Resolve target
+                    let targetId: string;
+                    if (opts.target) {
+                        const override = intRegistry.lookupWithTargetOverride(ref, opts.target);
+                        targetId = override.targetId!;
+                    } else if (base.targetId) {
+                        targetId = base.targetId;
+                    } else {
+                        const compatible = intRegistry.getCompatibleTargets(integrationId, operation.tool);
+                        die(
+                            `Integration "${integrationId}" has no defaultTarget. ` +
+                            `Use --target with one of: ${compatible.join(", ")}`
+                        );
+                        return;
+                    }
 
                     const intConfig = ctx.integrations.get(integrationId);
                     const target = intConfig.integration.targets.find((t) => t.id === targetId);
                     if (!target) {
                         die(`Target "${targetId}" not found in integration "${integrationId}".`);
+                        return;
+                    }
+
+                    // Find the tool config within the target
+                    const toolConfig = target.tools.find((tc) => tc.type === operation.tool);
+                    if (!toolConfig) {
+                        const compatible = intRegistry.getCompatibleTargets(integrationId, operation.tool);
+                        die(
+                            `Target "${targetId}" does not support tool "${operation.tool}". ` +
+                            `Compatible targets: ${compatible.join(", ")}`
+                        );
                         return;
                     }
 
@@ -340,33 +375,33 @@ export function registerOpCommands(program: Command): void {
 
                     await ctx.vault.unlock();
 
-                    if (!target.credential) {
-                        die(`Target "${targetId}" has no credential configured.`);
+                    if (!toolConfig.credential) {
+                        die(`Target "${targetId}" ${operation.tool} tool has no credential configured.`);
                         return;
                     }
 
                     if (operation.tool === "http") {
-                        const baseUrl = target.config["base_url"] as string | undefined;
+                        const baseUrl = toolConfig.config["base_url"] as string | undefined;
                         if (!baseUrl) {
-                            die(`Target "${targetId}" is missing config.base_url.`);
+                            die(`Target "${targetId}" is missing config.base_url for http tool.`);
                             return;
                         }
                         const httpOp = operation as HttpOperation;
                         const rendered = renderApiExecution(httpOp.execution, resolvedParams);
-                        const credential = await ctx.resolver.resolveForTarget(integrationId, targetId, target.credential);
+                        const credential = await ctx.resolver.resolveForTarget(integrationId, targetId, toolConfig.credential);
                         const result = await executeApiCall(ctx.vault, credential, ctx.audit, {
                             method: rendered.method,
                             path: rendered.path,
                             query: rendered.query,
                             body: rendered.body,
                             baseUrl,
-                            auth: target.credential.kind === "api_token" ? target.credential.auth : undefined,
+                            auth: toolConfig.credential.kind === "api_token" ? toolConfig.credential.auth : undefined,
                         });
                         outputApiResponse(result, opts.httpHeaders ?? false);
                     } else {
                         const sqlOp = operation as SqlOperation;
                         const rendered = renderDbExecution(sqlOp.execution, resolvedParams);
-                        const credential = await ctx.resolver.resolveForTarget(integrationId, targetId, target.credential);
+                        const credential = await ctx.resolver.resolveForTarget(integrationId, targetId, toolConfig.credential);
                         if (!credential) {
                             die(`Target "${targetId}" credential resolved to null — check credential kind.`);
                             return;
@@ -502,27 +537,28 @@ export function registerOpCommands(program: Command): void {
         .command("add")
         .description("Add an operation to a registered integration or app config")
         .option("--app <app>", "App ID (legacy model)")
-        .option("--integration <id>", "Integration ID (new model)")
-        .requiredOption("--name <name>", "Operation name (lowercase alphanumeric-dashes)")
+        .option("--integration <id>", "Integration ID")
+        .option("--raw <yaml>", "Operation YAML inline (integration model)")
+        .option("--file <path>", "YAML file to read from; use - for stdin (integration model)")
         .option("--kind <kind>", "Operation kind for legacy model: api or db")
-        .option("--tool <tool>", "Operation tool for new model: http or sql")
-        .option("--method <method>", "HTTP method: GET|POST|PUT|PATCH|DELETE")
-        .option("--path <path>", "API path template (e.g. /orders/{{ orderId }})")
-        .option("--sql <sql>", "SQL query template (db/sql only)")
-        .option("--param <spec>", "Parameter spec: name:type:required:description (repeatable)", collectArr, [] as string[])
+        .option("--name <name>", "Operation name (legacy model)")
+        .option("--method <method>", "HTTP method: GET|POST|PUT|PATCH|DELETE (legacy model)")
+        .option("--path <path>", "API path template (legacy model)")
+        .option("--sql <sql>", "SQL query template (legacy model)")
+        .option("--param <spec>", "Parameter spec: name:type:required:description (legacy, repeatable)", collectArr, [] as string[])
         .option("--profile <profile>", "Default profile name (legacy model)")
         .option("--default-env <env>", "Default environment name (legacy model)")
-        .option("--default-target <target>", "Default target ID (new model)")
-        .option("--tag <tag>", "Tag (repeatable)", collectArr, [] as string[])
-        .option("--body <template>", "Request body template; use {{ varName }} for params")
-        .option("--readonly", "Mark operation as read-only")
-        .option("--description <text>", "Operation description")
-        .action((opts: {
+        .option("--tag <tag>", "Tag (repeatable, legacy model)", collectArr, [] as string[])
+        .option("--body <template>", "Request body template (legacy model)")
+        .option("--readonly", "Mark operation as read-only (legacy model)")
+        .option("--description <text>", "Operation description (legacy model)")
+        .action(async (opts: {
             app?: string;
             integration?: string;
-            name: string;
+            raw?: string;
+            file?: string;
+            name?: string;
             kind?: string;
-            tool?: string;
             method?: string;
             path?: string;
             body?: string;
@@ -530,7 +566,6 @@ export function registerOpCommands(program: Command): void {
             param: string[];
             profile?: string;
             defaultEnv?: string;
-            defaultTarget?: string;
             tag: string[];
             readonly?: boolean;
             description?: string;
@@ -538,20 +573,17 @@ export function registerOpCommands(program: Command): void {
             const ctx = getContext();
 
             if (!opts.app && !opts.integration) {
-                die("Provide either --app <id> (legacy) or --integration <id> (new model).");
-                return;
-            }
-
-            let params;
-            try {
-                params = opts.param.map(parseParamSpec);
-            } catch (err) {
-                die(err instanceof Error ? err.message : String(err));
+                die("Provide either --app <id> (legacy) or --integration <id>.");
                 return;
             }
 
             if (opts.integration) {
-                // New model: write to integration YAML
+                // New model: require --raw or --file
+                if (!opts.raw && !opts.file) {
+                    die("Provide --raw <yaml> or --file <path> (use - for stdin).");
+                    return;
+                }
+
                 const intEntries = ctx.integrations.list();
                 const intEntry = intEntries.find((e) => e.id === opts.integration);
                 if (!intEntry) {
@@ -559,55 +591,25 @@ export function registerOpCommands(program: Command): void {
                     return;
                 }
 
-                const tool = opts.tool ?? (opts.kind === "db" ? "sql" : opts.kind === "api" ? "http" : undefined);
-                if (tool !== "http" && tool !== "sql") {
-                    die(`Provide --tool http or --tool sql for integration operations.`);
-                    return;
-                }
-
-                let rawOp: Record<string, unknown>;
-                if (tool === "http") {
-                    if (!opts.method) { die("--method is required for http operations"); return; }
-                    if (!opts.path) { die("--path is required for http operations"); return; }
-                    rawOp = {
-                        tool: "http",
-                        name: opts.name,
-                        ...(opts.description && { description: opts.description }),
-                        ...(opts.defaultTarget && { defaultTarget: opts.defaultTarget }),
-                        ...(opts.tag.length > 0 && { tags: opts.tag }),
-                        ...(opts.readonly !== undefined && { readOnly: opts.readonly }),
-                        parameters: params,
-                        execution: { method: opts.method.toUpperCase(), path: opts.path, ...(opts.body && { body: opts.body }) },
-                    };
+                let rawYaml: string;
+                if (opts.raw) {
+                    rawYaml = opts.raw;
+                } else if (opts.file === "-") {
+                    rawYaml = await readStdin();
                 } else {
-                    if (!opts.sql) { die("--sql is required for sql operations"); return; }
-                    rawOp = {
-                        tool: "sql",
-                        name: opts.name,
-                        ...(opts.description && { description: opts.description }),
-                        ...(opts.defaultTarget && { defaultTarget: opts.defaultTarget }),
-                        ...(opts.tag.length > 0 && { tags: opts.tag }),
-                        parameters: params,
-                        execution: { sql: opts.sql },
-                    };
+                    if (!fs.existsSync(opts.file!)) {
+                        die(`File not found: ${opts.file}`);
+                        return;
+                    }
+                    rawYaml = fs.readFileSync(opts.file!, "utf8");
                 }
 
-                const fsLib = require("fs") as typeof import("fs");
-                const yamlLib = require("js-yaml") as typeof import("js-yaml");
-                const raw = yamlLib.load(fsLib.readFileSync(intEntry.config_path, "utf8")) as Record<string, unknown>;
-                const integration = raw["integration"] as Record<string, unknown>;
-                const ops = ((integration["operations"] ?? []) as Array<Record<string, unknown>>);
-
-                if (ops.some((o) => o["name"] === opts.name)) {
-                    die(`Operation "${opts.name}" already exists in integration "${opts.integration}". Remove it first.`);
-                    return;
+                try {
+                    const operation = addIntegrationOperationFromRaw(intEntry.config_path, rawYaml);
+                    console.log(`✓ Added operation "${operation.name}" to integration "${opts.integration}"`);
+                } catch (err) {
+                    die(err instanceof Error ? err.message : String(err));
                 }
-
-                ops.push(rawOp);
-                integration["operations"] = ops;
-                raw["integration"] = integration;
-                fsLib.writeFileSync(intEntry.config_path, yamlLib.dump(raw, { lineWidth: 120, noRefs: true }), "utf8");
-                console.log(`✓ Added operation "${opts.name}" to integration "${opts.integration}"`);
                 return;
             }
 
@@ -620,9 +622,22 @@ export function registerOpCommands(program: Command): void {
             }
             const configPath = appEntry.config_path;
 
+            let params;
+            try {
+                params = opts.param.map(parseParamSpec);
+            } catch (err) {
+                die(err instanceof Error ? err.message : String(err));
+                return;
+            }
+
             const kind = opts.kind;
             if (kind !== "api" && kind !== "db") {
                 die(`Invalid --kind "${kind ?? "(not provided)"}". Must be "api" or "db".`);
+                return;
+            }
+
+            if (!opts.name) {
+                die("--name is required for legacy app operations.");
                 return;
             }
 
@@ -671,10 +686,65 @@ export function registerOpCommands(program: Command): void {
             console.log(`✓ Added operation "${opts.name}" to app "${opts.app}"`);
         });
 
+    // ── op edit ───────────────────────────────────────────────────────────────
+    op
+        .command("edit <ref>")
+        .description("Replace an integration operation in-place (e.g. hexlane op edit bsp/sync --raw '...')")
+        .option("--raw <yaml>", "Operation YAML inline")
+        .option("--file <path>", "YAML file to read from; use - for stdin")
+        .action(async (ref: string, opts: { raw?: string; file?: string }) => {
+            if (!opts.raw && !opts.file) {
+                die("Provide --raw <yaml> or --file <path> (use - for stdin).");
+                return;
+            }
+
+            const slash = ref.indexOf("/");
+            if (slash < 1) {
+                die(`Invalid ref "${ref}": expected format integration-id/op-name`);
+                return;
+            }
+            const integrationId = ref.slice(0, slash);
+            const opName = ref.slice(slash + 1);
+
+            const ctx = getContext();
+            const intRegistry = new IntegrationOperationRegistry(ctx.integrations);
+            if (!intRegistry.hasIntegrationRef(ref)) {
+                die(`Operation "${ref}" not found. Use 'hexlane op list' to see available operations.`);
+                return;
+            }
+
+            const intEntries = ctx.integrations.list();
+            const intEntry = intEntries.find((e) => e.id === integrationId);
+            if (!intEntry) {
+                die(`Integration "${integrationId}" config not found.`);
+                return;
+            }
+
+            let rawYaml: string;
+            if (opts.raw) {
+                rawYaml = opts.raw;
+            } else if (opts.file === "-") {
+                rawYaml = await readStdin();
+            } else {
+                if (!fs.existsSync(opts.file!)) {
+                    die(`File not found: ${opts.file}`);
+                    return;
+                }
+                rawYaml = fs.readFileSync(opts.file!, "utf8");
+            }
+
+            try {
+                editIntegrationOperation(intEntry.config_path, opName, rawYaml);
+                console.log(`✓ Updated operation "${opName}" in integration "${integrationId}"`);
+            } catch (err) {
+                die(err instanceof Error ? err.message : String(err));
+            }
+        });
+
     // ── op delete ─────────────────────────────────────────────────────────────
     op
         .command("delete <ref>")
-        .description("Remove an operation from a registered integration or app config (e.g. bsp-forno/list-broker-integrations)")
+        .description("Remove an operation from a registered integration or app config (e.g. bsp/sync)")
         .action((ref: string) => {
             const slash = ref.indexOf("/");
             if (slash < 1) {
@@ -686,50 +756,20 @@ export function registerOpCommands(program: Command): void {
 
             const ctx = getContext();
 
-            // Try new model by targetRef
+            // Try integration model
             const intRegistry = new IntegrationOperationRegistry(ctx.integrations);
-            if (intRegistry.hasTargetRef(ref)) {
-                const entry = intRegistry.lookupByTargetRef(ref);
-                const intEntries = ctx.integrations.list();
-                const intEntry = intEntries.find((e) => e.id === entry.integrationId);
-                if (intEntry) {
-                    const fsLib = require("fs") as typeof import("fs");
-                    const yamlLib = require("js-yaml") as typeof import("js-yaml");
-                    const raw = yamlLib.load(fsLib.readFileSync(intEntry.config_path, "utf8")) as Record<string, unknown>;
-                    const integration = raw["integration"] as Record<string, unknown>;
-                    const ops = ((integration["operations"] ?? []) as Array<Record<string, unknown>>);
-                    const idx = ops.findIndex((o) => o["name"] === opName);
-                    if (idx >= 0) {
-                        ops.splice(idx, 1);
-                        integration["operations"] = ops;
-                        raw["integration"] = integration;
-                        fsLib.writeFileSync(intEntry.config_path, yamlLib.dump(raw, { lineWidth: 120, noRefs: true }), "utf8");
-                        console.log(`✓ Removed operation "${opName}" from integration "${entry.integrationId}"`);
-                        return;
-                    }
-                }
-            }
-
-            // Try new model by integrationRef
             if (intRegistry.hasIntegrationRef(ref)) {
                 const entry = intRegistry.lookupByIntegrationRef(ref);
                 const intEntries = ctx.integrations.list();
                 const intEntry = intEntries.find((e) => e.id === entry.integrationId);
                 if (intEntry) {
-                    const fsLib = require("fs") as typeof import("fs");
-                    const yamlLib = require("js-yaml") as typeof import("js-yaml");
-                    const raw = yamlLib.load(fsLib.readFileSync(intEntry.config_path, "utf8")) as Record<string, unknown>;
-                    const integration = raw["integration"] as Record<string, unknown>;
-                    const ops = ((integration["operations"] ?? []) as Array<Record<string, unknown>>);
-                    const idx = ops.findIndex((o) => o["name"] === opName);
-                    if (idx >= 0) {
-                        ops.splice(idx, 1);
-                        integration["operations"] = ops;
-                        raw["integration"] = integration;
-                        fsLib.writeFileSync(intEntry.config_path, yamlLib.dump(raw, { lineWidth: 120, noRefs: true }), "utf8");
+                    try {
+                        deleteIntegrationOperation(intEntry.config_path, opName);
                         console.log(`✓ Removed operation "${opName}" from integration "${entry.integrationId}"`);
-                        return;
+                    } catch (err) {
+                        die(err instanceof Error ? err.message : String(err));
                     }
+                    return;
                 }
             }
 
@@ -737,7 +777,7 @@ export function registerOpCommands(program: Command): void {
             const appEntries = ctx.apps.list();
             const appEntry = appEntries.find((e) => e.id === scopeId);
             if (!appEntry) {
-                die(`"${scopeId}" is not a registered target, integration, or app.`);
+                die(`"${scopeId}" is not a registered integration or app.`);
                 return;
             }
 

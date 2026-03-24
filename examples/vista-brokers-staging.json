@@ -1,0 +1,42 @@
+[
+  {
+    "bspId": 1,
+    "integrationName": "Belossá",
+    "vistaBrokerId": "belossai"
+  },
+  {
+    "bspId": 2,
+    "integrationName": "C10 Imóveis",
+    "vistaBrokerId": "c10imove"
+  },
+  {
+    "bspId": 3,
+    "integrationName": "Smart Brokers",
+    "vistaBrokerId": "smartbro"
+  },
+  {
+    "bspId": 4,
+    "integrationName": "MASSOTE BROKERS",
+    "vistaBrokerId": "cli40706"
+  },
+  {
+    "bspId": 5,
+    "integrationName": "Posh Imóveis",
+    "vistaBrokerId": "poshimov"
+  },
+  {
+    "bspId": 6,
+    "integrationName": "Union SP",
+    "vistaBrokerId": "unionsp3"
+  },
+  {
+    "bspId": 7,
+    "integrationName": "City BH Imóveis",
+    "vistaBrokerId": "citybhim"
+  },
+  {
+    "bspId": 8,
+    "integrationName": "Vivar Imóveis",
+    "vistaBrokerId": "vivar24164"
+  }
+]

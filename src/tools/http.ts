@@ -58,20 +58,24 @@ toolRegistry.register({
                     if (!found) die(`Target "${targetId}" not found in any registered integration.`);
                     const { integrationId, target } = found;
 
-                    if (target.tool !== "http") {
-                        die(`Target "${targetId}" uses tool "${target.tool}", not "http".`);
+                    const httpTool = target.tools.find((t) => t.type === "http");
+                    if (!httpTool) {
+                        die(`Target "${targetId}" has no http tool configured.`);
+                        return;
                     }
-                    if (!target.credential) {
-                        die(`Target "${targetId}" has no credential configured.`);
+                    if (!httpTool.credential) {
+                        die(`Target "${targetId}" http tool has no credential configured.`);
+                        return;
                     }
 
-                    const baseUrl = target.config["base_url"] as string | undefined;
+                    const baseUrl = httpTool.config["base_url"] as string | undefined;
                     if (!baseUrl) {
-                        die(`Target "${targetId}" has no base_url configured.`);
+                        die(`Target "${targetId}" is missing config.base_url for http tool.`);
+                        return;
                     }
 
                     await ctx.vault.unlock();
-                    const credential = await ctx.resolver.resolveForTarget(integrationId, targetId, target.credential);
+                    const credential = await ctx.resolver.resolveForTarget(integrationId, targetId, httpTool.credential);
 
                     const result = await executeApiCall(ctx.vault, credential, ctx.audit, {
                         method: opts.method ?? "GET",
@@ -79,7 +83,7 @@ toolRegistry.register({
                         body,
                         baseUrl,
                         query: Object.keys(query).length > 0 ? query : undefined,
-                        auth: target.credential.kind === "api_token" ? target.credential.auth : undefined,
+                        auth: httpTool.credential.kind === "api_token" ? httpTool.credential.auth : undefined,
                     });
 
                     outputApiResponse(result, opts.httpHeaders ?? false);

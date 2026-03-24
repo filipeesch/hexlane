@@ -27,10 +27,11 @@ Before performing any task against an external system, always discover first:
 ```bash
 hexlane integration list                                        # see all registered integrations
 hexlane integration show <integration-id>                       # see targets and credential config
-hexlane op list --filter <keyword>                              # search operations by name, description, or tag
+hexlane op list --filter <keyword>                              # search operations by name, description, tag, ref, or tool
 hexlane op list --integration <integration-id>                  # browse by integration
 hexlane op list --integration <integration-id> --filter <keyword>  # combine both
-hexlane op show <target-id>/<op-name>                           # see full details: params, execution, examples
+hexlane op show <integration-id>/<op-name>                           # raw YAML of the operation (pipeable to op edit)
+hexlane op targets <integration-id>/<op-name>                        # list compatible targets; ✓ = integration.defaultTarget
 ```
 
 ### Running operations
@@ -38,7 +39,13 @@ hexlane op show <target-id>/<op-name>                           # see full detai
 Prefer named operations over raw `http call` or `sql query` whenever one exists for the task:
 
 ```bash
-hexlane op run <target-id>/<op-name> --param key=value
+hexlane op run <integration-id>/<op-name> --param key=value
+```
+
+To run against a specific target (overrides `integration.defaultTarget`):
+
+```bash
+hexlane op run <integration-id>/<op-name> --target <target-id> --param key=value
 ```
 
 Default output format:
@@ -50,35 +57,37 @@ Default output format:
 Always use `--dry-run` first to confirm the rendered request before executing:
 
 ```bash
-hexlane op run <target-id>/<op-name> --param key=value --dry-run
+hexlane op run <integration-id>/<op-name> --param key=value --dry-run
 ```
 
-### Creating operations
+### Creating and editing operations
 
-If no operation exists for a task, create one with `op add` before running it. This makes the operation reusable for future sessions.
+If no operation exists for a task, create one with `op add` before running it. This makes the operation reusable for future sessions. Supply the full operation as YAML via `--raw` (inline string) or `--file` (path or `-` for stdin):
 
-For HTTP operations:
 ```bash
-hexlane op add \
-  --integration <integration-id> \
-  --name <op-name> \
-  --tool http \
-  --method <GET|POST|PUT|PATCH|DELETE> \
-  --path "<path with {{ param }} placeholders>" \
-  --param "name:type:required:description" \
-  --default-target <target-id> \
-  --description "<what this operation does>"
+hexlane op add --integration <integration-id> --raw "
+name: get-user
+tool: http
+description: Fetch a user profile
+parameters:
+  - name: username
+    type: string
+    required: true
+execution:
+  method: GET
+  path: /users/{{ username }}
+"
+
+hexlane op add --integration <integration-id> --file ./get-user.yaml   # from file
+cat get-user.yaml | hexlane op add --integration <integration-id> --file -  # from stdin
 ```
 
-For SQL operations:
+To update an existing operation in-place:
+
 ```bash
-hexlane op add \
-  --integration <integration-id> \
-  --name <op-name> \
-  --tool sql \
-  --sql "SELECT ... WHERE col = :paramName" \
-  --param "paramName:type:required:description" \
-  --default-target <target-id>
+hexlane op edit <integration-id>/<op-name> --raw "..."
+hexlane op edit <integration-id>/<op-name> --file ./updated.yaml
+hexlane op show <integration-id>/<op-name> | hexlane op edit <integration-id>/<op-name> --file -  # round-trip
 ```
 
 If the user provides an OpenAPI spec, use the paths, methods, and parameter definitions from it to create accurate operations.
@@ -92,11 +101,12 @@ This is useful when the same operation is used across multiple targets but a tem
 ```yaml
 targets:
   - id: grafana-staging
-    tool: http
-    config:
-      base_url: https://grafana.staging.example.com
     params:
       datasource_uid: ben9xq9lzod8gf
+    tools:
+      - type: http
+        config:
+          base_url: https://grafana.staging.example.com
 ```
 
 For the injected key to be accepted, declare it as `optional` in the operation's `parameters` list. The dry-run output will include a `target_params` field showing what was injected.
@@ -128,7 +138,7 @@ Always use named parameters (`:name` syntax) — never interpolate values direct
 
 ### File system operations (`fs` targets)
 
-For targets with `tool: fs`, use `hexlane fs` commands.
+For targets with `tools: [{type: fs, ...}]`, use `hexlane fs` commands.
 
 ```bash
 # Read a single file
@@ -193,20 +203,13 @@ echo "$MY_TOKEN" | hexlane credential set --target <target-id>
 hexlane credential set --target <target-id> --connection-string postgresql://user:pass@host:5432/dbname
 ```
 
-### Parameter format for `--param` in `op add`
-
-`name:type:required_or_optional:description`
-
-- `type`: `string` (default), `integer`, `number`, `boolean`
-- third segment: `required` or `optional`
-- description may contain colons
-
 ### Rules
 
 - Never construct raw HTTP requests or connection strings yourself — always go through hexlane
 - Never interpolate variable values into `--path` or `--sql` strings — always use `--param`
 - Always use `op list --filter <keyword>` to search for relevant operations before reaching for `http call` or `sql query`
 - Always `op add` a new operation before running it if one doesn't exist — don't run ad-hoc calls for tasks that will recur
+- Use `op targets <integration-id>/<op>` when unsure which target to use or when `op run` fails with a "no default target" error
 - Always pass `--machine` for output you will read or parse — the default is human-readable, not model-optimised
 - Pass `--http-headers` only when response headers are needed for the task
 - For `fs` writes: always use `--dry-run` first to verify scope; use `--expect` with `--lines` to guard stale line numbers; use `rollback restore` to undo any write

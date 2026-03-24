@@ -8,6 +8,10 @@ import {
     buildOperation,
     addOperationToFile,
     deleteOperationFromFile,
+    addIntegrationOperationFromRaw,
+    editIntegrationOperation,
+    deleteIntegrationOperation,
+    getIntegrationOperationYaml,
 } from "../op-writer.js";
 
 // ─── parseParamSpec ───────────────────────────────────────────────────────────
@@ -285,5 +289,266 @@ describe("deleteOperationFromFile", () => {
         const result = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
         const app = result["app"] as Record<string, unknown>;
         expect((app["operations"] as unknown[]).length).toBe(0);
+    });
+});
+
+// ─── Integration YAML helpers ─────────────────────────────────────────────────
+
+function makeIntegrationYaml(ops: unknown[] = []): string {
+    return yaml.dump({
+        version: 1,
+        integration: {
+            id: "test-integ",
+            targets: [
+                {
+                    id: "prod",
+                    tools: [{ type: "http", config: { base_url: "https://api.example.com" } }],
+                },
+            ],
+            operations: ops,
+        },
+    });
+}
+
+const VALID_OP_YAML = yaml.dump({
+    name: "list-items",
+    tool: "http",
+    parameters: [],
+    execution: { method: "GET", path: "/items" },
+});
+
+const SECOND_OP_YAML = yaml.dump({
+    name: "get-item",
+    tool: "http",
+    parameters: [{ name: "id", type: "string", required: true }],
+    execution: { method: "GET", path: "/items/{{ id }}" },
+});
+
+// ─── getIntegrationOperationYaml ──────────────────────────────────────────────
+
+describe("getIntegrationOperationYaml", () => {
+    let tmpDir: string;
+    let configPath: string;
+
+    beforeEach(() => {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hexlane-integ-test-"));
+        configPath = path.join(tmpDir, "test-integ.yaml");
+    });
+
+    afterEach(() => {
+        fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("returns raw YAML of an existing operation", () => {
+        const op = { name: "list-items", tool: "http", parameters: [], execution: { method: "GET", path: "/items" } };
+        fs.writeFileSync(configPath, makeIntegrationYaml([op]), "utf8");
+
+        const result = getIntegrationOperationYaml(configPath, "list-items");
+
+        const parsed = yaml.load(result) as Record<string, unknown>;
+        expect(parsed["name"]).toBe("list-items");
+        expect(parsed["tool"]).toBe("http");
+    });
+
+    it("throws when operation is not found", () => {
+        fs.writeFileSync(configPath, makeIntegrationYaml(), "utf8");
+        expect(() => getIntegrationOperationYaml(configPath, "ghost")).toThrow(/not found/);
+    });
+
+    it("returned string is valid YAML", () => {
+        const op = { name: "list-items", tool: "http", parameters: [], execution: { method: "GET", path: "/items" } };
+        fs.writeFileSync(configPath, makeIntegrationYaml([op]), "utf8");
+
+        const result = getIntegrationOperationYaml(configPath, "list-items");
+        expect(() => yaml.load(result)).not.toThrow();
+    });
+});
+
+// ─── addIntegrationOperationFromRaw ──────────────────────────────────────────
+
+describe("addIntegrationOperationFromRaw", () => {
+    let tmpDir: string;
+    let configPath: string;
+
+    beforeEach(() => {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hexlane-integ-test-"));
+        configPath = path.join(tmpDir, "test-integ.yaml");
+        fs.writeFileSync(configPath, makeIntegrationYaml(), "utf8");
+    });
+
+    afterEach(() => {
+        fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("appends the operation to an empty list", () => {
+        addIntegrationOperationFromRaw(configPath, VALID_OP_YAML);
+
+        const raw = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+        const integration = raw["integration"] as Record<string, unknown>;
+        const ops = integration["operations"] as Array<Record<string, unknown>>;
+        expect(ops).toHaveLength(1);
+        expect(ops[0]!["name"]).toBe("list-items");
+    });
+
+    it("returns the validated ToolOperation", () => {
+        const result = addIntegrationOperationFromRaw(configPath, VALID_OP_YAML);
+        expect(result.name).toBe("list-items");
+        expect(result.tool).toBe("http");
+    });
+
+    it("appends when operations already exist", () => {
+        addIntegrationOperationFromRaw(configPath, VALID_OP_YAML);
+        addIntegrationOperationFromRaw(configPath, SECOND_OP_YAML);
+
+        const raw = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+        const integration = raw["integration"] as Record<string, unknown>;
+        const ops = integration["operations"] as Array<Record<string, unknown>>;
+        expect(ops).toHaveLength(2);
+        expect(ops[1]!["name"]).toBe("get-item");
+    });
+
+    it("throws on duplicate operation name", () => {
+        addIntegrationOperationFromRaw(configPath, VALID_OP_YAML);
+        expect(() => addIntegrationOperationFromRaw(configPath, VALID_OP_YAML)).toThrow(/already exists/);
+    });
+
+    it("throws on invalid YAML", () => {
+        expect(() => addIntegrationOperationFromRaw(configPath, "{ bad yaml: [}")).toThrow(/Invalid YAML/);
+    });
+
+    it("throws on schema validation failure", () => {
+        const badOp = yaml.dump({ name: "bad-op", tool: "http" }); // missing execution
+        expect(() => addIntegrationOperationFromRaw(configPath, badOp)).toThrow(/Invalid operation/);
+    });
+});
+
+// ─── editIntegrationOperation ─────────────────────────────────────────────────
+
+describe("editIntegrationOperation", () => {
+    let tmpDir: string;
+    let configPath: string;
+
+    beforeEach(() => {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hexlane-integ-test-"));
+        configPath = path.join(tmpDir, "test-integ.yaml");
+        const op = { name: "list-items", tool: "http", parameters: [], execution: { method: "GET", path: "/items" } };
+        fs.writeFileSync(configPath, makeIntegrationYaml([op]), "utf8");
+    });
+
+    afterEach(() => {
+        fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("replaces an existing operation in-place", () => {
+        const updated = yaml.dump({
+            name: "list-items",
+            tool: "http",
+            parameters: [],
+            execution: { method: "GET", path: "/v2/items" },
+        });
+
+        editIntegrationOperation(configPath, "list-items", updated);
+
+        const raw = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+        const integration = raw["integration"] as Record<string, unknown>;
+        const ops = integration["operations"] as Array<Record<string, unknown>>;
+        expect(ops).toHaveLength(1);
+        const exec = ops[0]!["execution"] as Record<string, unknown>;
+        expect(exec["path"]).toBe("/v2/items");
+    });
+
+    it("returns the updated ToolOperation", () => {
+        const updated = yaml.dump({
+            name: "list-items",
+            tool: "http",
+            description: "Updated description",
+            parameters: [],
+            execution: { method: "GET", path: "/items" },
+        });
+
+        const result = editIntegrationOperation(configPath, "list-items", updated);
+        expect(result.description).toBe("Updated description");
+    });
+
+    it("preserves other operations when editing", () => {
+        const secondOp = { name: "get-item", tool: "http", parameters: [], execution: { method: "GET", path: "/items/1" } };
+        const raw2 = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+        const integration2 = raw2["integration"] as Record<string, unknown>;
+        (integration2["operations"] as unknown[]).push(secondOp);
+        fs.writeFileSync(configPath, yaml.dump(raw2), "utf8");
+
+        const updated = yaml.dump({
+            name: "list-items",
+            tool: "http",
+            parameters: [],
+            execution: { method: "GET", path: "/v2/items" },
+        });
+        editIntegrationOperation(configPath, "list-items", updated);
+
+        const result = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+        const ops = ((result["integration"] as Record<string, unknown>)["operations"]) as Array<Record<string, unknown>>;
+        expect(ops).toHaveLength(2);
+        expect(ops[1]!["name"]).toBe("get-item");
+    });
+
+    it("throws when operation is not found", () => {
+        expect(() => editIntegrationOperation(configPath, "ghost", VALID_OP_YAML)).toThrow(/not found/);
+    });
+
+    it("throws on invalid YAML", () => {
+        expect(() => editIntegrationOperation(configPath, "list-items", "{ bad yaml: [}")).toThrow(/Invalid YAML/);
+    });
+
+    it("throws on schema validation failure", () => {
+        const badOp = yaml.dump({ name: "list-items", tool: "http" }); // missing execution
+        expect(() => editIntegrationOperation(configPath, "list-items", badOp)).toThrow(/Invalid operation/);
+    });
+});
+
+// ─── deleteIntegrationOperation ──────────────────────────────────────────────
+
+describe("deleteIntegrationOperation", () => {
+    let tmpDir: string;
+    let configPath: string;
+
+    beforeEach(() => {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hexlane-integ-test-"));
+        configPath = path.join(tmpDir, "test-integ.yaml");
+    });
+
+    afterEach(() => {
+        fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it("removes an operation by name", () => {
+        const ops = [
+            { name: "alpha", tool: "http", parameters: [], execution: { method: "GET", path: "/a" } },
+            { name: "beta", tool: "http", parameters: [], execution: { method: "GET", path: "/b" } },
+        ];
+        fs.writeFileSync(configPath, makeIntegrationYaml(ops), "utf8");
+
+        deleteIntegrationOperation(configPath, "alpha");
+
+        const raw = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+        const integration = raw["integration"] as Record<string, unknown>;
+        const remaining = integration["operations"] as Array<Record<string, unknown>>;
+        expect(remaining).toHaveLength(1);
+        expect(remaining[0]!["name"]).toBe("beta");
+    });
+
+    it("throws when operation name is not found", () => {
+        fs.writeFileSync(configPath, makeIntegrationYaml(), "utf8");
+        expect(() => deleteIntegrationOperation(configPath, "ghost")).toThrow(/not found/);
+    });
+
+    it("results in an empty array when the last operation is removed", () => {
+        const ops = [{ name: "only-op", tool: "http", parameters: [], execution: { method: "GET", path: "/x" } }];
+        fs.writeFileSync(configPath, makeIntegrationYaml(ops), "utf8");
+
+        deleteIntegrationOperation(configPath, "only-op");
+
+        const raw = yaml.load(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+        const integration = raw["integration"] as Record<string, unknown>;
+        expect((integration["operations"] as unknown[]).length).toBe(0);
     });
 });

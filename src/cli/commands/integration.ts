@@ -81,17 +81,19 @@ export function registerIntegrationCommands(program: Command): void {
                     output({
                         id: integ.id,
                         description: integ.description,
+                        defaultTarget: integ.defaultTarget,
                         targets: integ.targets.map((t) => ({
                             id: t.id,
-                            tool: t.tool,
-                            config: t.config,
-                            credential_kind: t.credential?.kind ?? "none",
+                            tools: t.tools.map((tc) => ({
+                                type: tc.type,
+                                config: tc.config,
+                                credential_kind: tc.credential?.kind ?? "none",
+                            })),
                         })),
                         operations: (integ.operations ?? []).map((op) => ({
                             name: op.name,
                             tool: op.tool,
                             description: op.description,
-                            defaultTarget: op.defaultTarget,
                         })),
                     });
                     return;
@@ -99,9 +101,15 @@ export function registerIntegrationCommands(program: Command): void {
 
                 console.log(`\nIntegration: ${integ.id}`);
                 if (integ.description) console.log(`  Description: ${integ.description}`);
+                if (integ.defaultTarget) console.log(`  Default target: ${integ.defaultTarget}`);
                 console.log(`\nTargets (${integ.targets.length}):`);
                 for (const t of integ.targets) {
-                    console.log(`  - ${t.id}  [${t.tool}]  credential: ${t.credential?.kind ?? "none"}`);
+                    console.log(`  - ${t.id}`);
+                    for (const tc of t.tools) {
+                        const credKind = tc.credential?.kind ?? "none";
+                        const configStr = Object.entries(tc.config).map(([k, v]) => `${k}=${v}`).join("  ");
+                        console.log(`      ${tc.type}  ${configStr}  credential: ${credKind}`);
+                    }
                 }
 
                 const ops = integ.operations ?? [];
@@ -111,10 +119,9 @@ export function registerIntegrationCommands(program: Command): void {
                         ops.map((op) => ({
                             name: op.name,
                             tool: op.tool,
-                            target: op.defaultTarget ?? "(first target)",
                             description: op.description ?? "",
                         })),
-                        ["name", "tool", "target", "description"],
+                        ["name", "tool", "description"],
                     );
                 } else {
                     console.log(`\nOperations: none`);

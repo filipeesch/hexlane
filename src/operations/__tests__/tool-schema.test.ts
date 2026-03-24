@@ -90,14 +90,13 @@ describe("HttpOperationSchema", () => {
         expect(result.parameters[0]?.name).toBe("userId");
     });
 
-    it("parses an operation with a defaultTarget", () => {
+    it("ignores unknown fields like defaultTarget (no per-op defaults)", () => {
         const result = parseHttp({
             tool: "http",
             name: "get-order",
-            defaultTarget: "my-app-api-prod",
             execution: { method: "GET", path: "/orders/:id" },
         });
-        expect(result.defaultTarget).toBe("my-app-api-prod");
+        expect("defaultTarget" in result).toBe(false);
     });
 
     it("rejects when name has uppercase letters", () => {

@@ -88,8 +88,6 @@ export interface LoadedOperation {
 const NewOperationBaseSchema = z.object({
     name: z.string().min(1).regex(/^[a-z0-9-]+$/, "Operation name must be lowercase alphanumeric with dashes"),
     description: z.string().optional(),
-    // Optional default target for `op run` when no target is given as prefix.
-    defaultTarget: z.string().optional(),
     tags: z.array(z.string()).optional(),
     parameters: z.array(OperationParameterSchema).default([]),
     examples: z.array(OperationExampleSchema).optional(),
