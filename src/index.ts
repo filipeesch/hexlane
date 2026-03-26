@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { registerAppCommands } from "./cli/commands/app.js";
 import { registerCredentialCommands } from "./cli/commands/credential.js";
 import { registerOpCommands } from "./cli/commands/op.js";
 import { registerIntegrationCommands } from "./cli/commands/integration.js";
@@ -16,7 +15,6 @@ program
     .option("--json", "Output as JSON (global flag)");
 
 registerInitCommand(program);
-registerAppCommands(program);
 registerCredentialCommands(program);
 registerOpCommands(program);
 registerIntegrationCommands(program);

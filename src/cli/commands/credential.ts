@@ -20,6 +20,19 @@ async function readStdin(): Promise<string> {
     });
 }
 
+/**
+ * Parses "integration-id/target-id" into its parts.
+ * Throws a user-friendly error if the format is invalid.
+ */
+function parseTargetArg(raw: string): { integrationId: string; targetId: string } {
+    const slash = raw.indexOf("/");
+    if (slash < 1 || slash === raw.length - 1) {
+        die(`Invalid --target format "${raw}". Expected integration-id/target-id`);
+        throw new Error(); // unreachable — die() exits
+    }
+    return { integrationId: raw.slice(0, slash), targetId: raw.slice(slash + 1) };
+}
+
 export function registerCredentialCommands(program: Command): void {
     const cred = program
         .command("credential")
@@ -29,16 +42,29 @@ export function registerCredentialCommands(program: Command): void {
         .command("list")
         .description("List stored credentials (metadata only — no secrets)")
         .option("--integration <id>", "Filter by integration ID")
-        .option("--target <target-id>", "Filter by target ID")
+        .option("--target <integration-id/target-id>", "Filter by integration-id/target-id or just integration-id")
         .option("--status <status>", "Filter by status: active|expired|revoked|invalid|all", "active")
         .option("--json", "Output as JSON")
         .action((opts: { integration?: string; target?: string; status?: string; json?: boolean }) => {
             if (opts.json) setJsonMode(true);
             try {
                 const ctx = getContext();
+                let filterApp = opts.integration;
+                let filterEnv: string | undefined;
+                if (opts.target) {
+                    const slash = opts.target.indexOf("/");
+                    if (slash > 0 && slash < opts.target.length - 1) {
+                        // full integration-id/target-id
+                        filterApp = opts.target.slice(0, slash);
+                        filterEnv = opts.target.slice(slash + 1);
+                    } else {
+                        // just integration-id
+                        filterApp = opts.target;
+                    }
+                }
                 const records = ctx.metadata.list({
-                    app: opts.integration,
-                    env: opts.target,
+                    app: filterApp,
+                    env: filterEnv,
                     status: (opts.status ?? "active") as never,
                 });
                 if (records.length === 0) {
@@ -64,36 +90,36 @@ export function registerCredentialCommands(program: Command): void {
     cred
         .command("inspect")
         .description("Show metadata for a specific credential (no secrets)")
-        .requiredOption("--target <target-id>", "Target ID")
+        .requiredOption("--target <integration-id/target-id>", "Target in integration-id/target-id format")
         .option("--json", "Output as JSON")
         .action((opts: { target: string; json?: boolean }) => {
             if (opts.json) setJsonMode(true);
             try {
                 const ctx = getContext();
-                const found = ctx.integrations.findByTargetId(opts.target);
-                if (!found) die(`Target "${opts.target}" not found in any registered integration.`);
-                const { integrationId, target } = found;
-                const toolWithCred = target.tools.find((t) => t.credential && t.credential.kind !== "public");
-                if (!toolWithCred?.credential) die(`Target "${opts.target}" has no credential configured.`);
-                const profileName = toolWithCred.credential.kind;
-                const record = ctx.metadata.findByIdentity(integrationId, opts.target, profileName);
+                const { integrationId, targetId } = parseTargetArg(opts.target);
+                const config = ctx.integrations.get(integrationId);
+                const target = config.integration.targets.find((t) => t.id === targetId);
+                if (!target) die(`Target "${targetId}" not found in integration "${integrationId}".`);
+                const toolWithCred = target!.tools.find((t) => t.credential && t.credential.kind !== "public");
+                if (!toolWithCred?.credential) die(`Target "${targetId}" has no credential configured.`);
+                const profileName = toolWithCred!.credential!.kind;
+                const record = ctx.metadata.findByIdentity(integrationId, targetId, profileName);
                 if (!record) {
-                    die(`No credential found for target "${opts.target}" — it may not have been acquired yet.`);
+                    die(`No credential found for "${opts.target}" — it may not have been acquired yet.`);
                 }
-                // Safe projection — vault_ref and id are internal, but non-secret
                 output({
-                    integration: record.app,
-                    target: record.env,
-                    kind: record.kind,
-                    status: record.status,
-                    renewable: Boolean(record.renewable),
-                    created_at: record.created_at,
-                    updated_at: record.updated_at,
-                    expires_at: record.expires_at,
-                    last_used_at: record.last_used_at,
-                    db_host: record.db_host,
-                    db_name: record.db_name,
-                    db_engine: record.db_engine,
+                    integration: record!.app,
+                    target: record!.env,
+                    kind: record!.kind,
+                    status: record!.status,
+                    renewable: Boolean(record!.renewable),
+                    created_at: record!.created_at,
+                    updated_at: record!.updated_at,
+                    expires_at: record!.expires_at,
+                    last_used_at: record!.last_used_at,
+                    db_host: record!.db_host,
+                    db_name: record!.db_name,
+                    db_engine: record!.db_engine,
                 });
             } catch (e: unknown) {
                 die((e as Error).message);
@@ -103,20 +129,21 @@ export function registerCredentialCommands(program: Command): void {
     cred
         .command("revoke")
         .description("Revoke a credential and delete it from the vault")
-        .requiredOption("--target <target-id>", "Target ID")
+        .requiredOption("--target <integration-id/target-id>", "Target in integration-id/target-id format")
         .option("--json", "Output as JSON")
         .action(async (opts: { target: string; json?: boolean }) => {
             if (opts.json) setJsonMode(true);
             try {
                 const ctx = getContext();
-                const found = ctx.integrations.findByTargetId(opts.target);
-                if (!found) die(`Target "${opts.target}" not found in any registered integration.`);
-                const { integrationId, target } = found;
-                const toolWithCred = target.tools.find((t) => t.credential && t.credential.kind !== "public");
-                if (!toolWithCred?.credential) die(`Target "${opts.target}" has no credential configured.`);
+                const { integrationId, targetId } = parseTargetArg(opts.target);
+                const config = ctx.integrations.get(integrationId);
+                const target = config.integration.targets.find((t) => t.id === targetId);
+                if (!target) die(`Target "${targetId}" not found in integration "${integrationId}".`);
+                const toolWithCred = target!.tools.find((t) => t.credential && t.credential.kind !== "public");
+                if (!toolWithCred?.credential) die(`Target "${targetId}" has no credential configured.`);
                 await ctx.vault.unlock();
-                await ctx.resolver.revoke(integrationId, opts.target, toolWithCred.credential.kind);
-                output({ message: `Credential revoked for target "${opts.target}"` });
+                await ctx.resolver.revoke(integrationId, targetId, toolWithCred!.credential!.kind);
+                output({ message: `Credential revoked for "${opts.target}"` });
             } catch (e: unknown) {
                 die((e as Error).message);
             }
@@ -125,33 +152,33 @@ export function registerCredentialCommands(program: Command): void {
     cred
         .command("renew")
         .description("Force renew a credential even if not yet expired")
-        .requiredOption("--target <target-id>", "Target ID")
+        .requiredOption("--target <integration-id/target-id>", "Target in integration-id/target-id format")
         .option("--json", "Output as JSON")
         .action(async (opts: { target: string; json?: boolean }) => {
             if (opts.json) setJsonMode(true);
             try {
                 const ctx = getContext();
-                const found = ctx.integrations.findByTargetId(opts.target);
-                if (!found) die(`Target "${opts.target}" not found in any registered integration.`);
-                const { integrationId, target } = found;
-                const toolWithCred = target.tools.find((t) => t.credential && t.credential.kind !== "public");
-                if (!toolWithCred?.credential) die(`Target "${opts.target}" has no credential configured.`);
+                const { integrationId, targetId } = parseTargetArg(opts.target);
+                const config = ctx.integrations.get(integrationId);
+                const target = config.integration.targets.find((t) => t.id === targetId);
+                if (!target) die(`Target "${targetId}" not found in integration "${integrationId}".`);
+                const toolWithCred = target!.tools.find((t) => t.credential && t.credential.kind !== "public");
+                if (!toolWithCred?.credential) die(`Target "${targetId}" has no credential configured.`);
                 await ctx.vault.unlock();
-                // Force expiry so resolver triggers renewal on next resolveForTarget call
-                const existing = ctx.metadata.findByIdentity(integrationId, opts.target, toolWithCred.credential.kind);
+                const existing = ctx.metadata.findByIdentity(integrationId, targetId, toolWithCred!.credential!.kind);
                 if (existing) {
                     ctx.metadata.updateAfterRenewal(
                         existing.id,
-                        new Date(Date.now() - 1000).toISOString(), // mark as just-expired
+                        new Date(Date.now() - 1000).toISOString(),
                         new Date().toISOString()
                     );
                 }
-                const record = await ctx.resolver.resolveForTarget(integrationId, opts.target, toolWithCred.credential);
+                const record = await ctx.resolver.resolveForTarget(integrationId, targetId, toolWithCred!.credential!);
                 output({
                     message: "Credential renewed",
                     integration: integrationId,
-                    target: opts.target,
-                    kind: toolWithCred.credential.kind,
+                    target: targetId,
+                    kind: toolWithCred!.credential!.kind,
                     expires_at: record?.expires_at ?? null,
                 });
             } catch (e: unknown) {
@@ -162,7 +189,7 @@ export function registerCredentialCommands(program: Command): void {
     cred
         .command("set")
         .description("Store a static credential in the vault for a target with acquire_strategy: static")
-        .requiredOption("--target <target-id>", "Target ID")
+        .requiredOption("--target <integration-id/target-id>", "Target in integration-id/target-id format")
         .option("--token <value>", "(api_token) Token value (omit to read from stdin)")
         .option("--connection-string <url>", "(db_connection) e.g. postgresql://user:pass@host:5432/dbname?sslmode=require")
         .option("--json", "Output as JSON")
@@ -170,30 +197,30 @@ export function registerCredentialCommands(program: Command): void {
             if (opts.json) setJsonMode(true);
             try {
                 const ctx = getContext();
+                const { integrationId, targetId } = parseTargetArg(opts.target);
+                const config = ctx.integrations.get(integrationId);
+                const target = config.integration.targets.find((t) => t.id === targetId);
+                if (!target) die(`Target "${targetId}" not found in integration "${integrationId}".`);
 
-                const found = ctx.integrations.findByTargetId(opts.target);
-                if (!found) die(`Target "${opts.target}" not found in any registered integration.`);
-                const { integrationId, target } = found;
-
-                const toolWithCred = target.tools.find((t) => t.credential && t.credential.kind !== "public");
+                const toolWithCred = target!.tools.find((t) => t.credential && t.credential.kind !== "public");
                 if (!toolWithCred?.credential) {
-                    die(`Target "${opts.target}" has no credential configured.`);
+                    die(`Target "${targetId}" has no credential configured.`);
                     return;
                 }
                 const targetCredential = toolWithCred.credential;
                 if (targetCredential.kind === "public") {
-                    die(`Target "${opts.target}" is kind "public" — public targets need no credential.`);
+                    die(`Target "${targetId}" is kind "public" — public targets need no credential.`);
                     return;
                 }
                 if (targetCredential.acquire_strategy.kind !== "static") {
-                    die(`Target "${opts.target}" uses acquire_strategy "${targetCredential.acquire_strategy.kind}", not "static". Only static targets require manual credential loading.`);
+                    die(`Target "${targetId}" uses acquire_strategy "${targetCredential.acquire_strategy.kind}", not "static". Only static targets require manual credential loading.`);
                     return;
                 }
 
                 await ctx.vault.unlock();
 
                 const profileName = targetCredential.kind;
-                const vaultRef = VaultManager.vaultRef(integrationId, opts.target, profileName);
+                const vaultRef = VaultManager.vaultRef(integrationId, targetId, profileName);
                 const now = new Date();
                 const renewalTtl = targetCredential.renewal_policy?.ttl;
 
@@ -247,11 +274,11 @@ export function registerCredentialCommands(program: Command): void {
 
                     ctx.vault.write(vaultRef, { kind: "db_connection", engine: engine as import("../../vault/types.js").DbEngine, host, port, user, password, dbname, ssl_mode: sslMode });
 
-                    const existing = ctx.metadata.findByIdentity(integrationId, opts.target, profileName);
+                    const existing = ctx.metadata.findByIdentity(integrationId, targetId, profileName);
                     const dbRecord: CredentialRecord = {
                         id: existing?.id ?? crypto.randomUUID(),
                         app: integrationId,
-                        env: opts.target,
+                        env: targetId,
                         profile: profileName,
                         kind: "db_connection",
                         status: "active",
@@ -268,7 +295,7 @@ export function registerCredentialCommands(program: Command): void {
                     ctx.metadata.upsert(dbRecord);
 
                     output({
-                        message: `Credential stored for target "${opts.target}"`,
+                        message: `Credential stored for "${opts.target}"`,
                         integration: integrationId,
                         engine,
                         host,
@@ -293,7 +320,6 @@ export function registerCredentialCommands(program: Command): void {
                 }
                 if (!token) die("Token cannot be empty");
 
-                // Parse JWT exp claim for expiry tracking; fall back to renewal_policy.ttl
                 const jwtExpiry = tryDecodeJwtExp(token);
                 let expiresAt: string | null = null;
                 if (jwtExpiry) {
@@ -304,11 +330,11 @@ export function registerCredentialCommands(program: Command): void {
 
                 ctx.vault.write(vaultRef, { kind: "api_token", token });
 
-                const existing = ctx.metadata.findByIdentity(integrationId, opts.target, profileName);
+                const existing = ctx.metadata.findByIdentity(integrationId, targetId, profileName);
                 const record: CredentialRecord = {
                     id: existing?.id ?? crypto.randomUUID(),
                     app: integrationId,
-                    env: opts.target,
+                    env: targetId,
                     profile: profileName,
                     kind: "api_token",
                     status: "active",
@@ -325,7 +351,7 @@ export function registerCredentialCommands(program: Command): void {
                 ctx.metadata.upsert(record);
 
                 output({
-                    message: `Credential stored for target "${opts.target}"`,
+                    message: `Credential stored for "${opts.target}"`,
                     integration: integrationId,
                     expires_at: expiresAt ?? "no expiry",
                 });
@@ -352,40 +378,21 @@ export function registerCredentialCommands(program: Command): void {
 
     cred
         .command("move")
-        .description("Move all credentials from one target ID to another (e.g. after renaming a target)")
-        .requiredOption("--from <target-id>", "Source target ID")
-        .requiredOption("--to <target-id>", "Destination target ID (raw — need not exist in config yet)")
-        .option("--integration <id>", "Integration ID (required when --from is ambiguous)")
+        .description("Move all credentials from one target to another (e.g. after renaming a target)")
+        .requiredOption("--from <integration-id/target-id>", "Source in integration-id/target-id format")
+        .requiredOption("--to <target-id>", "Destination target ID within the same integration")
         .option("--force", "Overwrite destination credential if it already exists")
         .option("--json", "Output as JSON")
-        .action(async (opts: { from: string; to: string; integration?: string; force?: boolean; json?: boolean }) => {
+        .action(async (opts: { from: string; to: string; force?: boolean; json?: boolean }) => {
             if (opts.json) setJsonMode(true);
             try {
                 const ctx = getContext();
 
-                // ── Resolve integration for the source target ─────────────────────
-                let integrationId: string;
-                if (opts.integration) {
-                    // Explicit integration supplied — just verify the integration exists.
-                    // We do NOT check that the source target exists in the config, because
-                    // the source target may have already been renamed/removed from YAML.
-                    ctx.integrations.get(opts.integration); // throws if integration is not registered
-                    integrationId = opts.integration;
-                } else {
-                    const matches = ctx.integrations.findAllByTargetId(opts.from);
-                    if (matches.length === 0) {
-                        die(`Target "${opts.from}" not found in any registered integration.`);
-                        return;
-                    }
-                    if (matches.length > 1) {
-                        const ids = matches.map((m) => m.integrationId).join(", ");
-                        die(`Target "${opts.from}" exists in multiple integrations: ${ids}. Use --integration <id> to disambiguate.`);
-                        return;
-                    }
-                    integrationId = matches[0].integrationId;
-                }
+                const { integrationId, targetId: fromTargetId } = parseTargetArg(opts.from);
 
-                // ── Warn if destination target doesn't exist in config ─────────────
+                // Verify the integration is registered (source target may no longer exist in YAML after a rename)
+                ctx.integrations.get(integrationId);
+
                 if (!ctx.integrations.targetExistsInIntegration(integrationId, opts.to)) {
                     process.stderr.write(
                         `Warning: target "${opts.to}" does not exist in integration "${integrationId}" config. ` +
@@ -393,16 +400,14 @@ export function registerCredentialCommands(program: Command): void {
                     );
                 }
 
-                // ── Find all credential records for the source target ──────────────
-                const records = ctx.metadata.listByTarget(integrationId, opts.from);
+                const records = ctx.metadata.listByTarget(integrationId, fromTargetId);
                 if (records.length === 0) {
-                    die(`No credentials found for target "${opts.from}" in integration "${integrationId}".`);
+                    die(`No credentials found for "${opts.from}".`);
                     return;
                 }
 
                 await ctx.vault.unlock();
 
-                // ── Collision check (before touching anything) ────────────────────
                 if (!opts.force) {
                     const collisions: string[] = [];
                     for (const record of records) {
@@ -420,7 +425,6 @@ export function registerCredentialCommands(program: Command): void {
                     }
                 }
 
-                // ── Move each credential record ───────────────────────────────────
                 const moved: Array<{ kind: string; from: string; to: string; expires_at: string | null }> = [];
                 const now = new Date().toISOString();
 
@@ -428,13 +432,9 @@ export function registerCredentialCommands(program: Command): void {
                     const oldVaultRef = record.vault_ref;
                     const newVaultRef = VaultManager.vaultRef(integrationId, opts.to, record.profile);
 
-                    // Read secret from old vault slot
                     const secret = ctx.vault.read(oldVaultRef);
-
-                    // Write to new vault slot
                     ctx.vault.write(newVaultRef, secret);
 
-                    // Upsert metadata record under the new target
                     ctx.metadata.upsert({
                         ...record,
                         id: crypto.randomUUID(),
@@ -444,15 +444,14 @@ export function registerCredentialCommands(program: Command): void {
                         last_used_at: null,
                     });
 
-                    // Clean up old vault + metadata
                     ctx.vault.delete(oldVaultRef);
                     ctx.metadata.delete(record.id);
 
-                    moved.push({ kind: record.kind, from: opts.from, to: opts.to, expires_at: record.expires_at });
+                    moved.push({ kind: record.kind, from: fromTargetId, to: opts.to, expires_at: record.expires_at });
                 }
 
                 output({
-                    message: `Moved ${moved.length} credential(s) from "${opts.from}" to "${opts.to}"`,
+                    message: `Moved ${moved.length} credential(s) from "${opts.from}" to "${integrationId}/${opts.to}"`,
                     integration: integrationId,
                     moved,
                 });

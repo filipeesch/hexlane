@@ -22,24 +22,28 @@ All secret values (tokens, passwords) are stored encrypted in the vault. SQLite 
 ```bash
 # List all cached credentials (metadata only — no secrets shown)
 hexlane credential list
-hexlane credential list --integration <id>     # filter by integration
-hexlane credential list --target <target-id>   # filter by target
-hexlane credential list --status expired       # active (default) | expired | revoked | all
+hexlane credential list --integration <id>                       # filter by integration
+hexlane credential list --target <integration-id/target-id>      # filter by specific target
+hexlane credential list --target <integration-id>                 # filter by integration (shorthand)
+hexlane credential list --status expired                          # active (default) | expired | revoked | all
 
 # Show metadata for a specific credential
-hexlane credential inspect --target <id>
+hexlane credential inspect --target <integration-id/target-id>
 
 # Force re-acquire on next use (e.g. after a 401)
-hexlane credential revoke --target <id>
+hexlane credential revoke --target <integration-id/target-id>
 
 # Force renew now even if not yet expired
-hexlane credential renew --target <id>
+hexlane credential renew --target <integration-id/target-id>
+
+# Move credentials to a renamed target (after updating the integration YAML)
+hexlane credential move --from <integration-id/source-target-id> --to <dest-target-id>
 
 # Remove expired and revoked entries from vault and metadata
 hexlane credential cleanup
 ```
 
-**On auth failure:** run `credential revoke --target <id>` then retry the original command. Add `--debug` to trace the full acquisition cycle.
+**On auth failure:** run `credential revoke --target <integration-id/target-id>` then retry the original command. Add `--debug` to trace the full acquisition cycle.
 
 ---
 
@@ -54,15 +58,15 @@ See [integration-config.md](integration-config.md#static-strategy) for how to de
 ```bash
 # Load a token (or rotate it by running the same command again)
 hexlane credential set \
-  --target my-app-api-prod \
+  --target my-app/my-app-api-prod \
   --token eyJhbGciOiJSUzI1NiJ9...
 
 # Pipe from a file
-cat ./token.jwt | hexlane credential set --target my-app-api-prod
+cat ./token.jwt | hexlane credential set --target my-app/my-app-api-prod
 
 # Pull from a secret manager without touching the filesystem
 vault kv get -field=token secret/my-service | hexlane credential set \
-  --target my-app-api-prod
+  --target my-app/my-app-api-prod
 ```
 
 If the token is a JWT with an `exp` claim, expiry is extracted automatically — no `renewal_policy.ttl` needed. When it expires, run `credential set` again with the new token.
@@ -72,11 +76,11 @@ If the token is a JWT with an `exp` claim, expiry is extracted automatically —
 ```bash
 # Supported schemes: postgresql, mysql, sqlserver, oracle
 hexlane credential set \
-  --target my-app-db-prod \
+  --target my-app/my-app-db-prod \
   --connection-string "postgresql://user:pass@host:5432/dbname?sslmode=require"
 
 # Use an environment variable to avoid exposing the password in shell history
-hexlane credential set --target my-app-db-prod \
+hexlane credential set --target my-app/my-app-db-prod \
   --connection-string "$DATABASE_URL"
 ```
 

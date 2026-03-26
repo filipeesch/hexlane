@@ -7,6 +7,8 @@ hexlane integration add --file ./github.yaml
 hexlane integration list
 hexlane integration show <id>
 hexlane integration remove <id>
+hexlane integration validate --file <path>   # validate a YAML file before registering
+hexlane integration validate --id <id>       # re-validate an already-registered integration
 ```
 
 See [`examples/github.yaml`](../examples/github.yaml) for a fully working example using public GitHub endpoints.

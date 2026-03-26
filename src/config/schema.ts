@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { OperationSchema } from "../operations/schema.js";
 
 // ─── Output Mapping ──────────────────────────────────────────────────────────
 
@@ -107,9 +106,9 @@ export const RenewalPolicySchema = z.object({
 );
 
 // ─── Profile ─────────────────────────────────────────────────────────────────
+// Used internally by the credential resolver (resolveForTarget constructs a
+// synthetic AuthenticatedProfile from IntegrationTargetCredential).
 
-// Public profile — no authentication, no vault, no credential acquisition.
-// Used for open APIs that require no token (e.g. GitHub public endpoints).
 const PublicProfileSchema = z.object({
     name: z.string().min(1).regex(/^[a-z0-9-]+$/, "Profile name must be lowercase alphanumeric with dashes"),
     kind: z.literal("public"),
@@ -120,13 +119,11 @@ const AuthenticatedProfileSchema = z.object({
     kind: z.enum(["api_token", "db_connection"]),
     acquire_strategy: StrategySchema,
     // auth controls how the token is injected into requests (api_token only).
-    // Defaults to Bearer if omitted.
     auth: AuthSchema.optional(),
     // renewal_policy is optional for static profiles (token has no auto-renewal).
     renewal_policy: RenewalPolicySchema.optional(),
 }).refine(
     (p) => {
-        // Static strategy has no output_mapping — skip the kind check
         if (p.acquire_strategy.kind === "static") return true;
         return (p.acquire_strategy as { output_mapping: { kind: string } }).output_mapping.kind === p.kind;
     },
@@ -135,31 +132,6 @@ const AuthenticatedProfileSchema = z.object({
 
 const ProfileSchema = z.union([PublicProfileSchema, AuthenticatedProfileSchema]);
 
-// ─── Environment ─────────────────────────────────────────────────────────────
-
-const EnvironmentSchema = z.object({
-    name: z.string().min(1).regex(/^[a-z0-9-]+$/, "Env name must be lowercase alphanumeric with dashes"),
-    base_url: z.string().url().optional(),
-    profiles: z.array(ProfileSchema).min(1),
-});
-
-// ─── App Config ──────────────────────────────────────────────────────────────
-
-export const AppConfigSchema = z.object({
-    version: z.literal(1),
-    app: z.object({
-        id: z.string().min(1).regex(/^[a-z0-9-]+$/, "App ID must be lowercase alphanumeric with dashes"),
-        description: z.string().optional(),
-        environments: z.array(EnvironmentSchema).min(1),
-        operations: z.array(OperationSchema).optional(),
-    }),
-});
-
-export type AppConfig = z.infer<typeof AppConfigSchema>;
-export type Profile = z.infer<typeof ProfileSchema>;
-export type PublicProfile = z.infer<typeof PublicProfileSchema>;
-export type AuthenticatedProfile = z.infer<typeof AuthenticatedProfileSchema>;
-export type Environment = z.infer<typeof EnvironmentSchema>;
 export type Strategy = z.infer<typeof StrategySchema>;
 export type ShellStrategy = z.infer<typeof ShellStrategySchema>;
 export type HttpStrategy = z.infer<typeof HttpStrategySchema>;
@@ -169,3 +141,6 @@ export type OutputMapping = z.infer<typeof OutputMappingSchema>;
 export type ApiTokenMapping = z.infer<typeof ApiTokenMappingSchema>;
 export type DbConnectionMapping = z.infer<typeof DbConnectionMappingSchema>;
 export type RenewalPolicy = z.infer<typeof RenewalPolicySchema>;
+export type Profile = z.infer<typeof ProfileSchema>;
+export type PublicProfile = z.infer<typeof PublicProfileSchema>;
+export type AuthenticatedProfile = z.infer<typeof AuthenticatedProfileSchema>;

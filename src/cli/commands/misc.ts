@@ -17,7 +17,7 @@ export function registerInitCommand(program: Command): void {
             try {
                 const hexlaneDir = getHexlaneDir();
                 const dirs = [
-                    path.join(hexlaneDir, "config", "apps"),
+                    path.join(hexlaneDir, "config", "integrations"),
                     path.join(hexlaneDir, "vault"),
                     path.join(hexlaneDir, "data"),
                     path.join(hexlaneDir, "audit"),
@@ -54,15 +54,15 @@ export function registerAuditCommand(program: Command): void {
     program
         .command("audit")
         .description("View audit log")
-        .option("--app <name>", "Filter by application")
+        .option("--integration <id>", "Filter by integration ID")
         .option("--limit <n>", "Number of recent events (default: 50)", parseInt)
         .option("--json", "Output as JSON")
-        .action((opts: { app?: string; limit?: number; json?: boolean }) => {
+        .action((opts: { integration?: string; limit?: number; json?: boolean }) => {
             if (opts.json) setJsonMode(true);
             try {
                 const hexlaneDir = getHexlaneDir();
                 const audit = new AuditLogger(hexlaneDir);
-                const events = audit.read({ app: opts.app, limit: opts.limit ?? 50 });
+                const events = audit.read({ app: opts.integration, limit: opts.limit ?? 50 });
                 output(events);
             } catch (e: unknown) {
                 die((e as Error).message);

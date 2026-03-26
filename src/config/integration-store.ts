@@ -14,7 +14,7 @@ export interface IntegrationRegistry {
     integrations: Record<string, IntegrationRegistryEntry>;
 }
 
-function loadIntegrationConfig(filePath: string): IntegrationConfig {
+export function loadIntegrationConfig(filePath: string): IntegrationConfig {
     const resolved = path.resolve(filePath);
     if (!fs.existsSync(resolved)) {
         throw new Error(`Config file not found: ${resolved}`);
@@ -34,6 +34,15 @@ function loadIntegrationConfig(filePath: string): IntegrationConfig {
         throw new Error(`Invalid integration config:\n${issues}`);
     }
     return result.data;
+}
+
+export function validateIntegrationConfig(filePath: string): { valid: boolean; errors: string[] } {
+    try {
+        loadIntegrationConfig(filePath);
+        return { valid: true, errors: [] };
+    } catch (e: unknown) {
+        return { valid: false, errors: [(e as Error).message] };
+    }
 }
 
 export class IntegrationStore {

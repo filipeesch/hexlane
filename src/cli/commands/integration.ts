@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { getContext } from "../context.js";
 import { output, outputTable, die, setJsonMode, setMachineMode } from "../output.js";
+import { loadIntegrationConfig, validateIntegrationConfig } from "../../config/integration-store.js";
 
 export function registerIntegrationCommands(program: Command): void {
     const integration = program
@@ -132,15 +133,59 @@ export function registerIntegrationCommands(program: Command): void {
             }
         });
 
+    // ── integration validate ───────────────────────────────────────────────────
+    integration
+        .command("validate")
+        .description("Validate an integration config file or a registered integration")
+        .option("--file <path>", "Path to a YAML file to validate (not yet registered)")
+        .option("--id <id>", "Re-validate an already-registered integration")
+        .option("--json", "Output as JSON")
+        .action((opts: { file?: string; id?: string; json?: boolean }) => {
+            if (opts.json) setJsonMode(true);
+            if (!opts.file && !opts.id) {
+                die("Provide --file <path> or --id <id>");
+                return;
+            }
+            if (opts.file) {
+                const result = validateIntegrationConfig(opts.file);
+                if (result.valid) {
+                    output({ valid: true, file: opts.file });
+                } else {
+                    output({ valid: false, errors: result.errors });
+                    process.exit(1);
+                }
+                return;
+            }
+            // --id: re-validate the stored copy
+            const ctx = getContext();
+            try {
+                const config = ctx.integrations.get(opts.id!);
+                output({ valid: true, id: config.integration.id });
+            } catch (err) {
+                output({ valid: false, id: opts.id, errors: [err instanceof Error ? err.message : String(err)] });
+                process.exit(1);
+            }
+        });
+
     // ── integration remove ────────────────────────────────────────────────────
     integration
         .command("remove <id>")
-        .description("Remove a registered integration (does not delete the source file)")
-        .action((id: string) => {
+        .description("Remove a registered integration and all its credentials")
+        .option("--json", "Output as JSON")
+        .action(async (id: string, opts: { json?: boolean }) => {
+            if (opts.json) setJsonMode(true);
             const ctx = getContext();
             try {
+                const creds = ctx.metadata.list({ app: id });
+                if (creds.length > 0) {
+                    await ctx.vault.unlock();
+                    for (const cred of creds) {
+                        ctx.vault.delete(cred.vault_ref);
+                        ctx.metadata.delete(cred.id);
+                    }
+                }
                 ctx.integrations.remove(id);
-                console.log(`✓ Removed integration "${id}"`);
+                output({ message: `Integration "${id}" removed`, credentials_removed: creds.length });
             } catch (err) {
                 die(err instanceof Error ? err.message : String(err));
             }

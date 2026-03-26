@@ -21,7 +21,6 @@ hexlane op list --filter <text>                  # case-insensitive search (ref,
 
 hexlane op show <integration-id>/<op-name>            # raw YAML of the operation (pipeable)
 hexlane op targets <integration-id>/<op-name>         # list targets compatible with this operation
-hexlane op validate <integration-id>/<op-name>        # schema + cross-reference validation
 ```
 
 `op show` prints the raw YAML of the operation — useful for inspection and piping to `op edit`. `op targets` lists all targets in the integration whose `tools` array contains a matching tool type, and marks the default target with `✓`.
